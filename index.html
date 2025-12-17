@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PobreCraft Multiplayer</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #0f1220; color: white; font-family: Arial, Helvetica, sans-serif; overflow: hidden; }
+    #ui { position: fixed; top: 10px; left: 10px; z-index: 10; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px; }
+    #game { width: 100vw; height: 100vh; position: relative; }
+    .player { width: 32px; height: 32px; position: absolute; border-radius: 6px; text-align: center; font-size: 10px; color: #000; }
+  </style>
+</head>
+<body>
+
+<div id="ui">
+  <input id="nameInput" placeholder="Seu nome" />
+  <button onclick="startGame()">Entrar</button>
+</div>
+
+<div id="game"></div>
+
+<script type="module">
+  // Import Firebase SDK
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getDatabase, ref, set, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+  // Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyDsDeOjhkkKtXK8kBpuVORQ1FTI_EdBTdU",
+    authDomain: "pobrecraft-c517c.firebaseapp.com",
+    databaseURL: "https://pobrecraft-c517c.firebaseio.com",
+    projectId: "pobrecraft-c517c",
+    storageBucket: "pobrecraft-c517c.firebasestorage.app",
+    messagingSenderId: "906438912132",
+    appId: "1:906438912132:web:a3d9827600d3c0a52dbad1"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  const game = document.getElementById('game');
+  const players = {};
+
+  let me = {
+    id: crypto.randomUUID(),
+    name: "",
+    x: 200,
+    y: 200,
+    color: `hsl(${Math.random()*360},80%,60%)`
+  };
+
+  window.startGame = () => {
+    me.name = document.getElementById('nameInput').value || 'Player';
+    document.getElementById('ui').style.display = 'none';
+
+    const myRef = ref(db, 'players/' + me.id);
+    set(myRef, me);
+    onDisconnect(myRef).remove();
+
+    onValue(ref(db, 'players'), snap => {
+      const data = snap.val() || {};
+      renderPlayers(data);
+    });
+
+    window.addEventListener('keydown', e => {
+      const speed = 5;
+      if (e.key === 'w') me.y -= speed;
+      if (e.key === 's') me.y += speed;
+      if (e.key === 'a') me.x -= speed;
+      if (e.key === 'd') me.x += speed;
+      set(myRef, me);
+    });
+  };
+
+  function renderPlayers(data) {
+    for (const id in players) {
+      if (!data[id]) {
+        players[id].remove();
+        delete players[id];
+      }
+    }
+
+    for (const id in data) {
+      const p = data[id];
+      let el = players[id];
+
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'player';
+        el.style.background = p.color;
+        el.innerText = p.name;
+        players[id] = el;
+        game.appendChild(el);
+      }
+
+      el.style.left = p.x + 'px';
+      el.style.top = p.y + 'px';
+    }
+  }
+</script>
+
+</body>
+</html>
