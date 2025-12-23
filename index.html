@@ -1,106 +1,962 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PobreCraft Multiplayer</title>
-  <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; background: #0f1220; color: white; font-family: Arial, Helvetica, sans-serif; overflow: hidden; }
-    #ui { position: fixed; top: 10px; left: 10px; z-index: 10; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px; }
-    #game { width: 100vw; height: 100vh; position: relative; }
-    .player { width: 32px; height: 32px; position: absolute; border-radius: 6px; text-align: center; font-size: 10px; color: #000; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Super 3D Futebol - Multiplayer</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #1a202c; user-select: none; touch-action: none; }
+        canvas { display: block; }
+        .text-shadow { text-shadow: 2px 2px 4px rgba(0,0,0,0.8); }
+        .glass-panel { background: rgba(30, 41, 59, 0.85); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.1); }
+        
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            70% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-goal { animation: popIn 0.5s ease-out forwards; }
+        
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+            100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        .searching-pulse { animation: pulse-ring 2s infinite; }
+        
+        #loading-screen { z-index: 100; }
+    </style>
 </head>
 <body>
 
-<div id="ui">
-  <input id="nameInput" placeholder="Seu nome" />
-  <button onclick="startGame()">Entrar</button>
-</div>
+    <!-- Game Container -->
+    <div id="game-container" class="relative w-full h-screen">
+        
+        <!-- Main Menu -->
+        <div id="main-menu" class="absolute inset-0 flex flex-col items-center justify-center bg-black/90 text-white z-50 transition-all duration-500 bg-[url('https://images.unsplash.com/photo-1579952363873-27f3bade9f55?q=80&w=1935&auto=format&fit=crop')] bg-cover bg-center bg-blend-multiply">
+            <h1 class="text-5xl md:text-8xl font-black text-green-500 mb-2 tracking-tighter text-shadow italic transform -skew-x-6">SUPER 3D<br><span class="text-white">FUTEBOL</span></h1>
+            <p class="text-gray-300 mb-8 text-xl font-light tracking-widest">MULTIPLAYER EDITION</p>
+            
+            <div class="glass-panel p-8 rounded-2xl shadow-2xl w-full max-w-md flex flex-col gap-4">
+                <div class="space-y-2">
+                    <label class="text-sm text-gray-400 font-bold uppercase">Seu Nome</label>
+                    <input type="text" id="player-name-input" class="w-full bg-gray-900 border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-green-500 transition" placeholder="Jogador 1" value="Jogador 1">
+                </div>
 
-<div id="game"></div>
+                <div class="space-y-2">
+                    <label class="text-sm text-gray-400 font-bold uppercase">Modo de Jogo</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button class="mode-btn bg-green-600 hover:bg-green-500 text-white py-2 rounded font-bold border-2 border-green-400 active-mode" data-mode="1v1">1 vs 1</button>
+                        <button class="mode-btn bg-gray-700 hover:bg-gray-600 text-gray-300 py-2 rounded font-bold border-2 border-transparent" data-mode="2v2">2 vs 2</button>
+                        <button class="mode-btn bg-gray-700 hover:bg-gray-600 text-gray-300 py-2 rounded font-bold border-2 border-transparent" data-mode="5v5">5 vs 5</button>
+                    </div>
+                </div>
 
-<script type="module">
-  // Import Firebase SDK
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getDatabase, ref, set, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+                <hr class="border-gray-700 my-2">
 
-  // Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyDsDeOjhkkKtXK8kBpuVORQ1FTI_EdBTdU",
-    authDomain: "pobrecraft-c517c.firebaseapp.com",
-    databaseURL: "https://pobrecraft-c517c.firebaseio.com",
-    projectId: "pobrecraft-c517c",
-    storageBucket: "pobrecraft-c517c.firebasestorage.app",
-    messagingSenderId: "906438912132",
-    appId: "1:906438912132:web:a3d9827600d3c0a52dbad1"
-  };
+                <button id="btn-singleplayer" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xl rounded-xl shadow-lg transition-transform transform hover:scale-[1.02]">
+                    JOGAR OFFLINE (vs CPU)
+                </button>
+                <button id="btn-multiplayer" class="w-full py-4 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white font-bold text-xl rounded-xl shadow-lg transition-transform transform hover:scale-[1.02] flex items-center justify-center gap-2">
+                    <span>BUSCAR PARTIDA ONLINE</span>
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                </button>
+            </div>
+            
+            <p class="mt-6 text-xs text-gray-500">Controles: WASD (Mover) | ESPAÇO (Chutar)</p>
+        </div>
 
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
+        <!-- Matchmaking Screen -->
+        <div id="matchmaking-screen" class="absolute inset-0 flex flex-col items-center justify-center bg-black/95 text-white z-50 hidden">
+            <div class="w-24 h-24 rounded-full border-4 border-green-500 flex items-center justify-center mb-6 searching-pulse">
+                <svg class="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+            <h2 class="text-3xl font-bold mb-2">Procurando Oponente...</h2>
+            <p id="match-status" class="text-gray-400">Conectando ao servidor...</p>
+            <button id="btn-cancel-match" class="mt-8 px-6 py-2 border border-red-500 text-red-500 rounded hover:bg-red-500 hover:text-white transition">Cancelar</button>
+        </div>
 
-  const game = document.getElementById('game');
-  const players = {};
+        <!-- HUD -->
+        <div id="hud" class="absolute top-0 left-0 w-full p-4 flex justify-between items-start pointer-events-none hidden z-30">
+            <!-- Player Score -->
+            <div class="flex flex-col items-center">
+                <div class="text-xs text-blue-300 font-bold tracking-wider mb-1 bg-black/50 px-2 rounded" id="p1-name">VOCÊ</div>
+                <div class="bg-blue-900/90 text-white text-5xl font-black px-6 py-2 rounded-lg border-b-4 border-blue-600 shadow-xl min-w-[80px] text-center" id="score-home">0</div>
+            </div>
 
-  let me = {
-    id: crypto.randomUUID(),
-    name: "",
-    x: 200,
-    y: 200,
-    color: `hsl(${Math.random()*360},80%,60%)`
-  };
+            <!-- Timer & Info -->
+            <div class="flex flex-col items-center gap-2">
+                <div class="bg-gray-900/90 text-white font-mono text-3xl px-6 py-2 rounded-b-xl border-x-2 border-b-2 border-green-500 shadow-xl" id="timer">
+                    00:00
+                </div>
+                <div id="game-info" class="text-xs font-bold text-yellow-400 bg-black/60 px-3 py-1 rounded-full uppercase hidden">Prorrogação</div>
+            </div>
 
-  window.startGame = () => {
-    me.name = document.getElementById('nameInput').value || 'Player';
-    document.getElementById('ui').style.display = 'none';
+            <!-- CPU/Opponent Score -->
+            <div class="flex flex-col items-center">
+                <div class="text-xs text-red-300 font-bold tracking-wider mb-1 bg-black/50 px-2 rounded" id="p2-name">ADVERSÁRIO</div>
+                <div class="bg-red-900/90 text-white text-5xl font-black px-6 py-2 rounded-lg border-b-4 border-red-600 shadow-xl min-w-[80px] text-center" id="score-away">0</div>
+            </div>
+        </div>
 
-    const myRef = ref(db, 'players/' + me.id);
-    set(myRef, me);
-    onDisconnect(myRef).remove();
+        <!-- Goal Overlay -->
+        <div id="notification-overlay" class="absolute inset-0 flex items-center justify-center pointer-events-none hidden z-40 bg-black/20 backdrop-blur-[2px]">
+            <div class="transform -rotate-6 text-center">
+                <h1 id="notification-text" class="text-9xl font-black text-yellow-400 drop-shadow-[0_10px_0_rgba(0,0,0,1)] stroke-black animate-goal" style="-webkit-text-stroke: 4px black;">GOL!!!</h1>
+                <p id="scorer-name" class="text-4xl font-bold text-white text-shadow mt-4"></p>
+            </div>
+        </div>
+        
+        <!-- Waiting for Opponent Overlay (In-game) -->
+        <div id="waiting-overlay" class="absolute inset-0 flex items-center justify-center z-50 bg-black/80 hidden">
+            <h2 class="text-2xl text-white font-bold">Aguardando Oponente...</h2>
+        </div>
 
-    onValue(ref(db, 'players'), snap => {
-      const data = snap.val() || {};
-      renderPlayers(data);
-    });
+        <!-- Mobile Controls -->
+        <div id="mobile-controls" class="absolute bottom-6 left-0 w-full flex justify-between px-8 md:hidden z-30 pointer-events-auto">
+            <div id="joystick-area" class="w-36 h-36 bg-white/10 rounded-full border-2 border-white/20 backdrop-blur-sm relative shadow-lg">
+                <div id="joystick-knob" class="w-14 h-14 bg-white/90 rounded-full absolute top-11 left-11 shadow-xl border-2 border-gray-300"></div>
+            </div>
+            <button id="kick-btn" class="w-28 h-28 bg-gradient-to-br from-red-500 to-red-600 rounded-full border-4 border-red-400 active:scale-95 transition shadow-2xl flex items-center justify-center relative overflow-hidden group">
+                <span class="absolute inset-0 bg-white/20 group-active:bg-transparent"></span>
+                <span class="font-black text-white text-xl tracking-wider">CHUTE</span>
+            </button>
+        </div>
 
-    window.addEventListener('keydown', e => {
-      const speed = 5;
-      if (e.key === 'w') me.y -= speed;
-      if (e.key === 's') me.y += speed;
-      if (e.key === 'a') me.x -= speed;
-      if (e.key === 'd') me.x += speed;
-      set(myRef, me);
-    });
-  };
+    </div>
 
-  function renderPlayers(data) {
-    for (const id in players) {
-      if (!data[id]) {
-        players[id].remove();
-        delete players[id];
-      }
-    }
+    <!-- Initialization Scripts -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+                "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"
+            }
+        }
+    </script>
 
-    for (const id in data) {
-      const p = data[id];
-      let el = players[id];
+    <script type="module">
+        import * as THREE from 'three';
+        import { initializeApp } from 'firebase/app';
+        import { getDatabase, ref, set, onValue, push, remove, onDisconnect, update, get } from 'firebase/database';
 
-      if (!el) {
-        el = document.createElement('div');
-        el.className = 'player';
-        el.style.background = p.color;
-        el.innerText = p.name;
-        players[id] = el;
-        game.appendChild(el);
-      }
+        // --- Firebase Configuration ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDsDeOjhkkKtXK8kBpuVORQ1FTI_EdBTdU",
+            authDomain: "pobrecraft-c517c.firebaseapp.com",
+            projectId: "pobrecraft-c517c",
+            storageBucket: "pobrecraft-c517c.firebasestorage.app",
+            messagingSenderId: "906438912132",
+            appId: "1:906438912132:web:a3d9827600d3c0a52dbad1"
+        };
 
-      el.style.left = p.x + 'px';
-      el.style.top = p.y + 'px';
-    }
-  }
-</script>
+        let app, db;
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getDatabase(app);
+            console.log("Firebase initialized");
+        } catch (e) {
+            console.error("Firebase init failed:", e);
+            alert("Erro ao conectar no serviço online. O modo offline ainda funcionará.");
+        }
 
+        // --- Game Constants & Globals ---
+        const FIELD_WIDTH = 34;
+        const FIELD_LENGTH = 54;
+        const GOAL_WIDTH = 10;
+        
+        // Settings
+        let GAME_MODE = '1v1'; // 1v1, 2v2, 5v5
+        let IS_MULTIPLAYER = false;
+        let PLAYER_NAME = "Jogador 1";
+        let PLAYER_ID = 'player_' + Math.random().toString(36).substr(2, 9);
+        let MATCH_ID = null;
+        let IS_HOST = false; // Player 1 is host (physics authority)
+        
+        // Physics
+        const PHYSICS_RATE = 1/60;
+        let physicsAccumulator = 0;
+        
+        // THREE globals
+        let scene, camera, renderer;
+        let fieldGroup, ballMesh;
+        
+        // Entities
+        let players = []; // Array of { mesh, data, role, team }
+        // Team 0 = Blue (Bottom/Positive Z goal), Team 1 = Red (Top/Negative Z goal)
+        // Note: Blue defends Positive Z, attacks Negative Z. Red defends Negative Z, attacks Positive Z.
+        
+        let ball = { x: 0, z: 0, vx: 0, vz: 0, radius: 0.7 };
+        
+        // Game State
+        let gameState = {
+            scoreRed: 0,
+            scoreBlue: 0,
+            time: 0,
+            isPlaying: false,
+            phase: 'menu' // menu, matchmaking, game
+        };
+
+        // Inputs
+        const keys = { w: false, a: false, s: false, d: false, space: false };
+        let joystickVector = { x: 0, y: 0 };
+
+        // DOM
+        const uiMenu = document.getElementById('main-menu');
+        const uiMatchmaking = document.getElementById('matchmaking-screen');
+        const uiHud = document.getElementById('hud');
+        const uiWaiting = document.getElementById('waiting-overlay');
+        const uiStatus = document.getElementById('match-status');
+        
+        // --- Initialization ---
+        function init() {
+            setupThreeJS();
+            setupInputs();
+            setupUI();
+            animate();
+        }
+
+        function setupThreeJS() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a202c);
+            scene.fog = new THREE.Fog(0x1a202c, 40, 90);
+
+            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 45, 55); 
+            camera.lookAt(0, 0, 5);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('game-container').appendChild(renderer.domElement);
+
+            // Lights
+            const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambient);
+            
+            const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+            sun.position.set(-30, 60, 20);
+            sun.castShadow = true;
+            sun.shadow.mapSize.width = 2048;
+            sun.shadow.mapSize.height = 2048;
+            sun.shadow.camera.left = -40;
+            sun.shadow.camera.right = 40;
+            sun.shadow.camera.top = 40;
+            sun.shadow.camera.bottom = -40;
+            scene.add(sun);
+
+            createStadium();
+            createBall();
+        }
+
+        function createStadium() {
+            fieldGroup = new THREE.Group();
+            scene.add(fieldGroup);
+
+            // Grass
+            const grassGeo = new THREE.PlaneGeometry(FIELD_WIDTH + 10, FIELD_LENGTH + 10);
+            const grassMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8 });
+            const ground = new THREE.Mesh(grassGeo, grassMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            fieldGroup.add(ground);
+
+            // Lines
+            const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff, opacity: 0.6, transparent: true });
+            const createLine = (w, l, x, z) => {
+                const m = new THREE.Mesh(new THREE.PlaneGeometry(w, l), lineMat);
+                m.rotation.x = -Math.PI / 2;
+                m.position.set(x, 0.05, z);
+                fieldGroup.add(m);
+            }
+            
+            // Borders
+            createLine(FIELD_WIDTH, 0.5, 0, FIELD_LENGTH/2);
+            createLine(FIELD_WIDTH, 0.5, 0, -FIELD_LENGTH/2);
+            createLine(0.5, FIELD_LENGTH, FIELD_WIDTH/2, 0);
+            createLine(0.5, FIELD_LENGTH, -FIELD_WIDTH/2, 0);
+            createLine(FIELD_WIDTH, 0.5, 0, 0); // Center
+
+            // Circle
+            const ring = new THREE.Mesh(new THREE.RingGeometry(5, 5.2, 32), lineMat);
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.y = 0.05;
+            fieldGroup.add(ring);
+
+            // Goals
+            const createGoal = (z, isBlue) => {
+                const goalGroup = new THREE.Group();
+                goalGroup.position.z = z;
+                
+                const postMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+                const netMat = new THREE.MeshBasicMaterial({ color: isBlue ? 0x3b82f6 : 0xef4444, wireframe: true, transparent: true, opacity: 0.3 });
+                
+                // Posts
+                const p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 4), postMat);
+                p1.position.set(-GOAL_WIDTH/2, 2, 0);
+                const p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 4), postMat);
+                p2.position.set(GOAL_WIDTH/2, 2, 0);
+                const cross = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, GOAL_WIDTH), postMat);
+                cross.rotation.z = Math.PI/2;
+                cross.position.set(0, 4, 0);
+                
+                // Net
+                const net = new THREE.Mesh(new THREE.BoxGeometry(GOAL_WIDTH, 4, 3), netMat);
+                net.position.set(0, 2, z > 0 ? 1.5 : -1.5);
+                
+                goalGroup.add(p1, p2, cross, net);
+                fieldGroup.add(goalGroup);
+            };
+            
+            createGoal(-FIELD_LENGTH/2, false); // Red Goal (Top)
+            createGoal(FIELD_LENGTH/2, true);  // Blue Goal (Bottom)
+        }
+
+        function createBall() {
+            const geom = new THREE.IcosahedronGeometry(ball.radius, 2);
+            // Vertex colors for pattern
+            const colors = [];
+            const pos = geom.getAttribute('position');
+            for(let i=0; i < pos.count; i+=3) {
+                const c = Math.random() > 0.6 ? 0.1 : 1.0;
+                colors.push(c,c,c, c,c,c, c,c,c);
+            }
+            geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            
+            const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4 });
+            ballMesh = new THREE.Mesh(geom, mat);
+            ballMesh.castShadow = true;
+            ballMesh.receiveShadow = true;
+            scene.add(ballMesh);
+        }
+
+        // --- Detailed Player Creation ---
+        function createPlayerMesh(teamColor) {
+            const group = new THREE.Group();
+
+            // Materials
+            const skinMat = new THREE.MeshStandardMaterial({ color: 0xffdbac }); // Skin
+            const shirtMat = new THREE.MeshStandardMaterial({ color: teamColor }); // Jersey
+            const shortsMat = new THREE.MeshStandardMaterial({ color: 0xffffff }); // White shorts
+            const socksMat = new THREE.MeshStandardMaterial({ color: teamColor });
+            const bootMat = new THREE.MeshStandardMaterial({ color: 0x111111 }); // Black boots
+
+            // Head
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.9, 0.8), skinMat);
+            head.position.y = 3.6;
+            head.castShadow = true;
+            group.add(head);
+
+            // Torso
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 0.7), shirtMat);
+            torso.position.y = 2.5;
+            torso.castShadow = true;
+            group.add(torso);
+
+            // Arms
+            const createLimb = (x, y, mat, w, h) => {
+                const limb = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), mat);
+                limb.position.set(x, y, 0);
+                limb.castShadow = true;
+                return limb;
+            };
+
+            const leftArm = createLimb(-0.8, 2.5, skinMat, 0.35, 1.3);
+            const rightArm = createLimb(0.8, 2.5, skinMat, 0.35, 1.3);
+            // Sleeve
+            leftArm.add(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.4), shirtMat).translateY(0.4));
+            rightArm.add(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.4), shirtMat).translateY(0.4));
+            
+            group.add(leftArm);
+            group.add(rightArm);
+            
+            // Legs pivot group (hips)
+            const hips = new THREE.Group();
+            hips.position.y = 1.8;
+            group.add(hips);
+            
+            // Shorts part of torso/hips
+            const shorts = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 0.75), shortsMat);
+            shorts.position.y = 0;
+            hips.add(shorts);
+
+            const leftLeg = createLimb(-0.35, -0.9, socksMat, 0.35, 1.5);
+            const rightLeg = createLimb(0.35, -0.9, socksMat, 0.35, 1.5);
+            
+            // Shoes
+            leftLeg.add(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.6), bootMat).translateY(-0.8).translateZ(0.1));
+            rightLeg.add(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.6), bootMat).translateY(-0.8).translateZ(0.1));
+
+            hips.add(leftLeg);
+            hips.add(rightLeg);
+
+            // Store references for animation
+            group.userData = { leftLeg, rightLeg, leftArm, rightArm };
+            return group;
+        }
+
+        // --- Game Logic ---
+        function startGame(mode, isMultiplayer) {
+            GAME_MODE = mode;
+            IS_MULTIPLAYER = isMultiplayer;
+            gameState.isPlaying = true;
+            gameState.scoreBlue = 0;
+            gameState.scoreRed = 0;
+            gameState.time = 0;
+            
+            // Clean up old players
+            players.forEach(p => scene.remove(p.mesh));
+            players = [];
+
+            // Define teams
+            const teamSize = mode === '5v5' ? 5 : (mode === '2v2' ? 2 : 1);
+            
+            // Spawn logic
+            const spawnTeam = (teamId) => {
+                const color = teamId === 0 ? 0x3b82f6 : 0xef4444; // Blue : Red
+                const zStart = teamId === 0 ? 20 : -20;
+                
+                for(let i=0; i<teamSize; i++) {
+                    const isBot = IS_MULTIPLAYER ? (teamId === 0 ? (i > 0) : true) : (teamId === 1 || i > 0);
+                    // In 1v1 MP: Team 0 Player 0 is Local, Team 1 Player 0 is Remote.
+                    // If Host: I am T0P0. Remote is T1P0.
+                    // If Guest: I am T1P0. Remote is T0P0.
+                    
+                    let role = 'bot';
+                    let label = "CPU";
+
+                    if (!IS_MULTIPLAYER) {
+                        if (teamId === 0 && i === 0) { role = 'local'; label = PLAYER_NAME; }
+                    } else {
+                        // Multiplayer logic
+                        if (IS_HOST) {
+                            if (teamId === 0 && i === 0) { role = 'local'; label = PLAYER_NAME; }
+                            else if (teamId === 1 && i === 0) { role = 'remote'; label = "Oponente"; }
+                        } else {
+                            if (teamId === 1 && i === 0) { role = 'local'; label = PLAYER_NAME; }
+                            else if (teamId === 0 && i === 0) { role = 'remote'; label = "Oponente"; }
+                        }
+                    }
+
+                    // Spread formation
+                    const xOff = (i % 3) * 6 * (i%2==0?1:-1);
+                    const zOff = Math.floor(i/3) * 8 * (teamId===0?-1:1);
+
+                    const p = {
+                        mesh: createPlayerMesh(color),
+                        x: xOff,
+                        z: zStart + zOff,
+                        vx: 0, vz: 0,
+                        angle: teamId === 0 ? Math.PI : 0,
+                        team: teamId,
+                        role: role,
+                        id: `${teamId}-${i}`,
+                        label: label
+                    };
+                    
+                    // Add Name Tag
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = 256; canvas.height = 64;
+                    ctx.fillStyle = "rgba(0,0,0,0.5)";
+                    ctx.fillRect(0,0,256,64);
+                    ctx.fillStyle = "white";
+                    ctx.font = "bold 40px Arial";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(label, 128, 32);
+                    
+                    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true }));
+                    sprite.position.y = 5.5;
+                    sprite.scale.set(4, 1, 1);
+                    p.mesh.add(sprite);
+
+                    scene.add(p.mesh);
+                    players.push(p);
+                }
+            };
+
+            spawnTeam(0);
+            spawnTeam(1);
+            
+            resetBall();
+            updateUI();
+        }
+        
+        function resetPositions() {
+            players.forEach(p => {
+               const zStart = p.team === 0 ? 20 : -20;
+               // Simple reset to start pos logic needs index, but for now just push back
+               p.z = zStart;
+               p.x = (Math.random() - 0.5) * 10;
+               p.vx = 0; p.vz = 0;
+            });
+            resetBall();
+        }
+
+        function resetBall() {
+            ball.x = 0; ball.z = 0; ball.vx = 0; ball.vz = 0;
+        }
+
+        // --- Physics & Updates ---
+        
+        function updateGame(dt) {
+            if (!gameState.isPlaying) return;
+            
+            // Timer
+            if (IS_HOST || !IS_MULTIPLAYER) {
+                gameState.time += dt;
+            }
+
+            // Controls for Local Player
+            const localP = players.find(p => p.role === 'local');
+            if (localP) {
+                const speed = 12;
+                let dx = 0, dz = 0;
+
+                if (keys.w) dz -= 1;
+                if (keys.s) dz += 1;
+                if (keys.a) dx -= 1;
+                if (keys.d) dx += 1;
+                
+                // Joystick
+                if (joystickVector.x !== 0 || joystickVector.y !== 0) {
+                    dx = joystickVector.x;
+                    dz = joystickVector.y;
+                }
+
+                if (dx !== 0 || dz !== 0) {
+                    const len = Math.sqrt(dx*dx + dz*dz);
+                    localP.vx = (dx/len) * speed;
+                    localP.vz = (dz/len) * speed;
+                    localP.angle = Math.atan2(localP.vx, localP.vz);
+                } else {
+                    localP.vx = 0;
+                    localP.vz = 0;
+                }
+                
+                // Multiplayer: Send Data
+                if (IS_MULTIPLAYER && MATCH_ID) {
+                    const updates = {};
+                    updates[`games/${MATCH_ID}/players/${localP.id}`] = {
+                        x: localP.x, z: localP.z,
+                        vx: localP.vx, vz: localP.vz,
+                        angle: localP.angle,
+                        kicking: keys.space
+                    };
+                    update(ref(db), updates);
+                }
+            }
+            
+            // Physics Update (Host or Singleplayer handles ball & bots)
+            if (!IS_MULTIPLAYER || IS_HOST) {
+                
+                // Ball Physics
+                ball.x += ball.vx * dt * 60;
+                ball.z += ball.vz * dt * 60;
+                ball.vx *= 0.98;
+                ball.vz *= 0.98;
+                
+                // Goal Checks
+                if (Math.abs(ball.z) > FIELD_LENGTH/2 - ball.radius) {
+                    if (Math.abs(ball.x) < GOAL_WIDTH/2) {
+                        // Goal
+                        if (ball.z > 0) scoreGoal(1); // Red Scored
+                        else scoreGoal(0); // Blue Scored
+                    } else {
+                        // Wall bounce
+                         if (ball.z > 0) ball.z = FIELD_LENGTH/2 - ball.radius;
+                         else ball.z = -FIELD_LENGTH/2 + ball.radius;
+                         ball.vz *= -0.8;
+                    }
+                }
+                
+                // Side Walls
+                if (Math.abs(ball.x) > FIELD_WIDTH/2 - ball.radius) {
+                    ball.x = Math.sign(ball.x) * (FIELD_WIDTH/2 - ball.radius);
+                    ball.vx *= -0.8;
+                }
+                
+                // Player & Bot Logic
+                players.forEach(p => {
+                    // Bot Logic
+                    if (p.role === 'bot') {
+                        // Simple AI
+                        const distToBall = Math.hypot(ball.x - p.x, ball.z - p.z);
+                        let tx = ball.x;
+                        let tz = ball.z;
+                        
+                        // Defense bias if ball is far on own side
+                        const ownGoalZ = p.team === 0 ? 25 : -25;
+                        
+                        // Move towards ball
+                        let dx = tx - p.x;
+                        let dz = tz - p.z;
+                        const len = Math.sqrt(dx*dx + dz*dz);
+                        const speed = 10;
+                        if(len > 0.1) {
+                            p.vx = (dx/len) * speed;
+                            p.vz = (dz/len) * speed;
+                            p.angle = Math.atan2(dx, dz);
+                        }
+                    }
+                    
+                    if (p.role !== 'remote') {
+                        p.x += p.vx * dt;
+                        p.z += p.vz * dt;
+                        
+                        // Bounds
+                        p.x = Math.max(-FIELD_WIDTH/2+1, Math.min(FIELD_WIDTH/2-1, p.x));
+                        p.z = Math.max(-FIELD_LENGTH/2+1, Math.min(FIELD_LENGTH/2-1, p.z));
+                    }
+
+                    // Collision with Ball
+                    const dist = Math.hypot(ball.x - p.x, ball.z - p.z);
+                    if (dist < 1.5) {
+                        // Kick
+                        const nx = (ball.x - p.x) / dist;
+                        const nz = (ball.z - p.z) / dist;
+                        
+                        const kickPower = (p.role === 'local' && keys.space) ? 0.8 : 0.15; // Hard kick or dribble
+                        // AI Kick
+                        const aiKick = (p.role === 'bot' && Math.random() < 0.05);
+                        const power = (p.role==='local' && keys.space) || aiKick ? 0.8 : 0.15;
+
+                        ball.vx += nx * power;
+                        ball.vz += nz * power;
+                        
+                        // Separate
+                        ball.x += nx * 0.2;
+                        ball.z += nz * 0.2;
+                    }
+                });
+                
+                // Sync Ball & Score to Guest
+                if (IS_MULTIPLAYER && MATCH_ID) {
+                    update(ref(db, `games/${MATCH_ID}/state`), {
+                         ball: ball,
+                         score: { r: gameState.scoreRed, b: gameState.scoreBlue },
+                         time: gameState.time
+                    });
+                }
+
+            } else {
+                // GUEST: Read physics from Host via listener (handled below)
+                // Just predict local movement for smoothness
+                if (localP) {
+                     localP.x += localP.vx * dt;
+                     localP.z += localP.vz * dt;
+                }
+            }
+
+            updateVisuals();
+        }
+
+        function updateVisuals() {
+            // Camera
+            let target;
+            const local = players.find(p => p.role === 'local');
+            if (local) {
+                target = new THREE.Vector3(local.x, 0, local.z);
+                target.lerp(new THREE.Vector3(ball.x, 0, ball.z), 0.3);
+            } else {
+                target = new THREE.Vector3(ball.x, 0, ball.z);
+            }
+            
+            camera.position.x += (target.x*0.6 - camera.position.x) * 0.1;
+            camera.lookAt(target.x * 0.2, 0, target.z * 0.1);
+            
+            // Objects
+            ballMesh.position.set(ball.x, ball.radius, ball.z);
+            ballMesh.rotation.x += ball.vz * 0.2;
+            ballMesh.rotation.z -= ball.vx * 0.2;
+
+            players.forEach(p => {
+                p.mesh.position.set(p.x, 0, p.z);
+                p.mesh.rotation.y = p.angle;
+                
+                // Animation
+                const speed = Math.hypot(p.vx, p.vz);
+                if (speed > 0.1) {
+                    const t = performance.now() * 0.015;
+                    p.mesh.userData.leftLeg.rotation.x = Math.sin(t) * 0.6;
+                    p.mesh.userData.rightLeg.rotation.x = Math.sin(t + Math.PI) * 0.6;
+                    p.mesh.userData.leftArm.rotation.x = Math.sin(t + Math.PI) * 0.4;
+                    p.mesh.userData.rightArm.rotation.x = Math.sin(t) * 0.4;
+                } else {
+                     p.mesh.userData.leftLeg.rotation.x = 0;
+                     p.mesh.userData.rightLeg.rotation.x = 0;
+                     p.mesh.userData.leftArm.rotation.x = 0;
+                     p.mesh.userData.rightArm.rotation.x = 0;
+                }
+            });
+            
+            // HUD
+            const min = Math.floor(gameState.time / 60);
+            const sec = Math.floor(gameState.time % 60);
+            document.getElementById('timer').innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+            document.getElementById('score-home').innerText = gameState.scoreBlue;
+            document.getElementById('score-away').innerText = gameState.scoreRed;
+        }
+        
+        function scoreGoal(teamId) {
+             if (teamId === 0) gameState.scoreBlue++;
+             else gameState.scoreRed++;
+             
+             // Show notif
+             const txt = document.getElementById('notification-text');
+             const overlay = document.getElementById('notification-overlay');
+             const name = document.getElementById('scorer-name');
+             
+             overlay.classList.remove('hidden');
+             name.innerText = teamId === 0 ? "EQUIPE AZUL" : "EQUIPE VERMELHA";
+             name.className = `text-4xl font-bold mt-4 text-shadow ${teamId===0?'text-blue-500':'text-red-500'}`;
+             
+             gameState.isPlaying = false;
+             
+             setTimeout(() => {
+                 overlay.classList.add('hidden');
+                 resetPositions();
+                 gameState.isPlaying = true;
+             }, 2500);
+        }
+
+        // --- Multiplayer Logic ---
+
+        function findMatch() {
+            uiMenu.style.display = 'none';
+            uiMatchmaking.style.display = 'flex';
+            uiMatchmaking.classList.remove('hidden');
+            uiStatus.innerText = "Entrando na fila...";
+
+            const queueRef = ref(db, 'matchmaking');
+            
+            // Check for open matches
+            get(queueRef).then((snapshot) => {
+                let found = false;
+                snapshot.forEach((child) => {
+                    if (found) return;
+                    const req = child.val();
+                    if (req.mode === GAME_MODE && req.status === 'waiting' && req.id !== PLAYER_ID) {
+                        // Found a match!
+                        found = true;
+                        joinMatch(child.key, req);
+                    }
+                });
+                
+                if (!found) {
+                    createMatchRequest();
+                }
+            });
+        }
+
+        function createMatchRequest() {
+            uiStatus.innerText = "Aguardando oponente...";
+            const newMatchRef = push(ref(db, 'matchmaking'));
+            MATCH_ID = newMatchRef.key;
+            IS_HOST = true;
+            
+            const matchData = {
+                host: PLAYER_ID,
+                hostName: PLAYER_NAME,
+                mode: GAME_MODE,
+                status: 'waiting',
+                created: Date.now()
+            };
+            
+            set(newMatchRef, matchData);
+            onDisconnect(newMatchRef).remove(); // Remove if I disconnect
+
+            // Listen for join
+            onValue(newMatchRef, (snap) => {
+                const data = snap.val();
+                if (data && data.guest) {
+                    // Start Game!
+                    startGameMultiplayer(data);
+                }
+            });
+            
+            // Cancel button
+            document.getElementById('btn-cancel-match').onclick = () => {
+                remove(newMatchRef);
+                uiMatchmaking.classList.add('hidden');
+                uiMenu.style.display = 'flex';
+            };
+        }
+
+        function joinMatch(matchId, matchData) {
+            uiStatus.innerText = "Partida encontrada! Entrando...";
+            MATCH_ID = matchId;
+            IS_HOST = false;
+            
+            const updates = {};
+            updates[`matchmaking/${matchId}/guest`] = PLAYER_ID;
+            updates[`matchmaking/${matchId}/guestName`] = PLAYER_NAME;
+            updates[`matchmaking/${matchId}/status`] = 'ready';
+            
+            update(ref(db), updates).then(() => {
+                // Init game listeners
+                startGameMultiplayer({...matchData, guest: PLAYER_ID, guestName: PLAYER_NAME});
+            });
+        }
+
+        function startGameMultiplayer(data) {
+            uiMatchmaking.classList.add('hidden');
+            uiHud.classList.remove('hidden');
+            
+            // Names
+            document.getElementById('p1-name').innerText = IS_HOST ? "VOCÊ (AZUL)" : data.hostName;
+            document.getElementById('p2-name').innerText = IS_HOST ? data.guestName : "VOCÊ (VERMELHO)";
+
+            startGame(GAME_MODE, true);
+
+            // Setup Listeners
+            const gameRef = ref(db, `games/${MATCH_ID}`);
+            
+            // Listen to remote player updates
+            const remoteId = IS_HOST ? "1-0" : "0-0"; // If I'm Host (0), Remote is (1). If I'm Guest (1), Remote is (0).
+            const remoteP = players.find(p => p.role === 'remote');
+            
+            // If Guest, listen to Game State (Ball, Score)
+            if (!IS_HOST) {
+                onValue(ref(db, `games/${MATCH_ID}/state`), (snap) => {
+                    const s = snap.val();
+                    if(s) {
+                        ball.x = s.ball.x;
+                        ball.z = s.ball.z;
+                        ball.vx = s.ball.vx;
+                        ball.vz = s.ball.vz;
+                        gameState.scoreRed = s.score.r;
+                        gameState.scoreBlue = s.score.b;
+                        gameState.time = s.time;
+                    }
+                });
+            }
+
+            // Listen to Player Moves
+            onValue(ref(db, `games/${MATCH_ID}/players`), (snap) => {
+                const pData = snap.val();
+                if (pData) {
+                    Object.keys(pData).forEach(key => {
+                        const pState = pData[key];
+                        // Update relevant player
+                        const pObj = players.find(p => p.id === key);
+                        if (pObj && pObj.role === 'remote') {
+                             // Interpolate? For now direct set
+                             pObj.x = pState.x;
+                             pObj.z = pState.z;
+                             pObj.vx = pState.vx;
+                             pObj.vz = pState.vz;
+                             pObj.angle = pState.angle;
+                        }
+                    });
+                }
+            });
+        }
+
+        // --- Main Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+            updateGame(0.016); // ~60fps fixed step
+            renderer.render(scene, camera);
+        }
+        
+        // --- UI Events ---
+        function setupUI() {
+            // Mode Select
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.mode-btn').forEach(b => {
+                        b.classList.remove('bg-green-600', 'border-green-400');
+                        b.classList.add('bg-gray-700', 'border-transparent');
+                    });
+                    e.target.classList.remove('bg-gray-700', 'border-transparent');
+                    e.target.classList.add('bg-green-600', 'border-green-400');
+                    GAME_MODE = e.target.dataset.mode;
+                });
+            });
+            
+            document.getElementById('btn-singleplayer').addEventListener('click', () => {
+                PLAYER_NAME = document.getElementById('player-name-input').value || "Jogador 1";
+                uiMenu.style.display = 'none';
+                uiHud.classList.remove('hidden');
+                startGame(GAME_MODE, false);
+            });
+            
+            document.getElementById('btn-multiplayer').addEventListener('click', () => {
+                if (GAME_MODE !== '1v1') {
+                    alert("Apenas o modo 1v1 está disponível para Multiplayer no momento.");
+                    return;
+                }
+                PLAYER_NAME = document.getElementById('player-name-input').value || "Jogador 1";
+                findMatch();
+            });
+        }
+
+        function setupInputs() {
+            window.addEventListener('keydown', (e) => {
+                const k = e.key.toLowerCase();
+                if (keys.hasOwnProperty(k) || k === ' ') keys[k === ' ' ? 'space' : k] = true;
+                if (e.key === 'ArrowUp') keys.w = true;
+                if (e.key === 'ArrowDown') keys.s = true;
+                if (e.key === 'ArrowLeft') keys.a = true;
+                if (e.key === 'ArrowRight') keys.d = true;
+            });
+            window.addEventListener('keyup', (e) => {
+                const k = e.key.toLowerCase();
+                if (keys.hasOwnProperty(k) || k === ' ') keys[k === ' ' ? 'space' : k] = false;
+                if (e.key === 'ArrowUp') keys.w = false;
+                if (e.key === 'ArrowDown') keys.s = false;
+                if (e.key === 'ArrowLeft') keys.a = false;
+                if (e.key === 'ArrowRight') keys.d = false;
+            });
+            
+            // Mobile
+            const joy = document.getElementById('joystick-area');
+            const knob = document.getElementById('joystick-knob');
+            let tId = null;
+            let origin = {x:0, y:0};
+            
+            joy.addEventListener('touchstart', e => {
+                e.preventDefault();
+                const t = e.changedTouches[0];
+                tId = t.identifier;
+                const r = joy.getBoundingClientRect();
+                origin = {x: r.left + r.width/2, y: r.top + r.height/2};
+                updateJoy(t.clientX, t.clientY);
+            });
+            joy.addEventListener('touchmove', e => {
+                e.preventDefault();
+                for(let i=0; i<e.changedTouches.length; i++){
+                    if(e.changedTouches[i].identifier === tId) updateJoy(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+                }
+            });
+            joy.addEventListener('touchend', e => {
+                e.preventDefault();
+                tId = null;
+                knob.style.transform = `translate(0px, 0px)`;
+                joystickVector = {x:0, y:0};
+            });
+            
+            function updateJoy(cx, cy) {
+                const max = 40;
+                let dx = cx - origin.x;
+                let dy = cy - origin.y;
+                const d = Math.sqrt(dx*dx + dy*dy);
+                if(d > max) { dx = (dx/d)*max; dy = (dy/d)*max; }
+                knob.style.transform = `translate(${dx}px, ${dy}px)`;
+                joystickVector = { x: dx/max, y: dy/max };
+            }
+            
+            const btn = document.getElementById('kick-btn');
+            btn.addEventListener('touchstart', e => { e.preventDefault(); keys.space = true; });
+            btn.addEventListener('touchend', e => { e.preventDefault(); keys.space = false; });
+        }
+
+        init();
+    </script>
 </body>
 </html>
