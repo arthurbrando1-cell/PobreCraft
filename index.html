@@ -1,1161 +1,898 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Super 3D Futebol - Multiplayer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wizard's Voice 3D - Voxel Edition</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #1a202c; user-select: none; touch-action: none; }
-        canvas { display: block; }
-        .text-shadow { text-shadow: 2px 2px 4px rgba(0,0,0,0.8); }
-        .glass-panel { background: rgba(30, 41, 59, 0.85); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.1); }
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
         
-        @keyframes popIn {
-            0% { transform: scale(0); opacity: 0; }
-            70% { transform: scale(1.2); opacity: 1; }
-            100% { transform: scale(1); opacity: 1; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
         }
-        .animate-goal { animation: popIn 0.5s ease-out forwards; }
         
-        @keyframes pulse-ring {
-            0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
-            100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        body {
+            font-family: 'VT323', monospace;
+            background: #1a1a2e;
+            overflow: hidden;
+            color: white;
         }
-        .searching-pulse { animation: pulse-ring 2s infinite; }
         
-        #loading-screen { z-index: 100; }
+        #gameContainer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+        
+        /* UI Layers */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: none;
+        }
+        
+        .ui-layer.active {
+            display: flex;
+            pointer-events: auto;
+        }
+
+        /* Minecraft-style Buttons */
+        .mc-btn {
+            background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAIklEQVQIW2NkQAKrVq36zwjjgzjwqhgYGP4zMhIyGIOJGQAyzxO9gO049wAAAABJRU5ErkJggg==') repeat;
+            background-color: #7c7c7c;
+            border: 4px solid #000;
+            border-left-color: #aaa;
+            border-top-color: #aaa;
+            border-right-color: #333;
+            border-bottom-color: #333;
+            color: white;
+            padding: 10px 20px;
+            font-family: 'VT323', monospace;
+            font-size: 1.5rem;
+            text-shadow: 2px 2px #000;
+            cursor: pointer;
+            transition: transform 0.1s;
+            image-rendering: pixelated;
+        }
+        
+        .mc-btn:active {
+            border-left-color: #333;
+            border-top-color: #333;
+            border-right-color: #aaa;
+            border-bottom-color: #aaa;
+            transform: translateY(2px);
+        }
+        
+        .mc-btn:hover {
+            background-color: #8c8c8c;
+        }
+
+        .mc-panel {
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 4px solid #fff;
+            image-rendering: pixelated;
+        }
+
+        .mc-input {
+            background: #000;
+            border: 2px solid #aaa;
+            color: #fff;
+            font-family: 'VT323', monospace;
+            padding: 5px;
+            font-size: 1.2rem;
+        }
+
+        /* Spell Book */
+        .spell-book {
+            position: fixed;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(45, 31, 20, 0.9);
+            border: 4px solid #8b6914;
+            padding: 15px;
+            max-height: 80vh;
+            overflow-y: auto;
+            pointer-events: auto;
+            font-size: 1.2rem;
+        }
+
+        /* Crosshair */
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 20;
+        }
+        #crosshair::before, #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.8);
+        }
+        #crosshair::before { top: 9px; left: 0; width: 20px; height: 2px; }
+        #crosshair::after { left: 9px; top: 0; width: 2px; height: 20px; }
+
+        /* HUD */
+        .hud-bar {
+            box-shadow: inset 0 0 0 2px #000;
+            border: 2px solid #fff;
+        }
+
+        /* Animations */
+        @keyframes floating {
+            0% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-10px) rotate(2deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+
+        .logo-title {
+            animation: floating 3s ease-in-out infinite;
+            text-shadow: 4px 4px 0 #000;
+        }
     </style>
 </head>
 <body>
+    <div id="gameContainer"></div>
+    
+    <!-- Crosshair (Hidden in Lobby) -->
+    <div id="crosshair" style="display: none;"></div>
 
-    <!-- Game Container -->
-    <div id="game-container" class="relative w-full h-screen">
+    <!-- LOBBY SCREEN -->
+    <div id="lobbyScreen" class="ui-layer active flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
+        <h1 class="logo-title text-8xl text-yellow-400 mb-8 font-bold tracking-widest">WIZARD CRAFT 3D</h1>
         
-        <!-- Main Menu -->
-        <div id="main-menu" class="absolute inset-0 flex flex-col items-center justify-center bg-black/90 text-white z-50 transition-all duration-500 bg-[url('https://images.unsplash.com/photo-1579952363873-27f3bade9f55?q=80&w=1935&auto=format&fit=crop')] bg-cover bg-center bg-blend-multiply">
-            <h1 class="text-5xl md:text-8xl font-black text-green-500 mb-2 tracking-tighter text-shadow italic transform -skew-x-6">SUPER 3D<br><span class="text-white">FUTEBOL</span></h1>
-            <p class="text-gray-300 mb-8 text-xl font-light tracking-widest">MULTIPLAYER EDITION</p>
-            <p class="text-yellow-400 mb-4 font-bold animate-pulse">NOVO: Controles de Mouse! Segure para chutar forte.</p>
-            
-            <div class="glass-panel p-8 rounded-2xl shadow-2xl w-full max-w-md flex flex-col gap-4">
-                <div class="space-y-2">
-                    <label class="text-sm text-gray-400 font-bold uppercase">Seu Nome</label>
-                    <input type="text" id="player-name-input" class="w-full bg-gray-900 border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-green-500 transition" placeholder="Jogador 1" value="Jogador 1">
+        <div class="flex gap-8">
+            <!-- Left Panel: Character Preview (Managed by 3D Scene in bg) -->
+            <div class="mc-panel p-6 w-80 flex flex-col items-center justify-between h-96">
+                <h2 class="text-2xl text-amber-300 border-b-2 border-white w-full text-center pb-2">SEU MAGO</h2>
+                <div class="flex-1 flex items-center justify-center text-gray-400 text-center">
+                    (Visualização 3D ao fundo)
                 </div>
+                <div class="w-full text-center text-sm text-gray-300">
+                    Nível 1 • Mago Supremo
+                </div>
+            </div>
 
-                <div class="space-y-2">
-                    <label class="text-sm text-gray-400 font-bold uppercase">Modo de Jogo</label>
-                    <div class="grid grid-cols-3 gap-2">
-                        <button class="mode-btn bg-green-600 hover:bg-green-500 text-white py-2 rounded font-bold border-2 border-green-400 active-mode" data-mode="1v1">1 vs 1</button>
-                        <button class="mode-btn bg-gray-700 hover:bg-gray-600 text-gray-300 py-2 rounded font-bold border-2 border-transparent" data-mode="2v2">2 vs 2</button>
-                        <button class="mode-btn bg-gray-700 hover:bg-gray-600 text-gray-300 py-2 rounded font-bold border-2 border-transparent" data-mode="5v5">5 vs 5</button>
+            <!-- Right Panel: Controls -->
+            <div class="mc-panel p-6 w-96 flex flex-col gap-4">
+                <button onclick="openModal('createRoomModal')" class="mc-btn w-full text-green-300">CRIAR SALA</button>
+                <button onclick="quickPlay()" class="mc-btn w-full text-yellow-300">JOGO RÁPIDO</button>
+                <button onclick="openModal('settingsModal')" class="mc-btn w-full text-gray-300">CONFIGURAÇÕES</button>
+                <div class="border-t-2 border-gray-600 my-2"></div>
+                <div class="text-center text-gray-400 text-lg">
+                    Use o mouse para olhar<br>WASD para mover<br>VOZ para conjurar
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CREATE ROOM MODAL -->
+    <div id="createRoomModal" class="ui-layer items-center justify-center bg-black/80 z-50">
+        <div class="mc-panel p-8 w-[500px]">
+            <h2 class="text-4xl text-center text-white mb-6 border-b-4 border-white pb-2">CRIAR SALA</h2>
+            
+            <div class="space-y-4 mb-8">
+                <div>
+                    <label class="block text-xl text-gray-300 mb-1">Nome da Sala</label>
+                    <input type="text" value="Sala do Mago" class="mc-input w-full">
+                </div>
+                
+                <div class="flex gap-4">
+                    <div class="flex-1">
+                        <label class="block text-xl text-gray-300 mb-1">Bots</label>
+                        <select id="botSelect" class="mc-input w-full">
+                            <option value="yes">SIM</option>
+                            <option value="no">NÃO</option>
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-xl text-gray-300 mb-1">Quantidade</label>
+                        <input type="number" value="10" min="1" max="50" class="mc-input w-full">
                     </div>
                 </div>
 
-                <hr class="border-gray-700 my-2">
+                <div>
+                    <label class="block text-xl text-gray-300 mb-1">Senha (Opcional)</label>
+                    <input type="password" placeholder="Deixe vazio para pública" class="mc-input w-full">
+                </div>
 
-                <button id="btn-singleplayer" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xl rounded-xl shadow-lg transition-transform transform hover:scale-[1.02]">
-                    JOGAR OFFLINE (vs CPU)
-                </button>
-                <button id="btn-multiplayer" class="w-full py-4 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white font-bold text-xl rounded-xl shadow-lg transition-transform transform hover:scale-[1.02] flex items-center justify-center gap-2">
-                    <span>BUSCAR PARTIDA ONLINE</span>
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                </button>
-            </div>
-            
-            <div class="mt-6 flex flex-col items-center gap-1">
-                <p class="text-xs text-gray-500">Controles PC: WASD (Mover) | MOUSE ESQUERDO (Segurar = Força, Soltar = Chutar)</p>
-                <div class="flex items-center gap-2 text-xs text-gray-500">
-                    <div class="w-4 h-4 border border-gray-500 rounded flex justify-center items-center">L</div>
-                    <span>= Chute Forte</span>
-                    <span class="mx-2">|</span>
-                    <div class="w-4 h-4 border border-gray-500 rounded flex justify-center items-center">R</div>
-                    <span>= Chute Tecnico (Em breve)</span>
+                <div>
+                    <label class="block text-xl text-gray-300 mb-1">Modo de Jogo</label>
+                    <select class="mc-input w-full">
+                        <option>Sobrevivência</option>
+                        <option>Mata-Mata</option>
+                        <option>Defesa de Torre</option>
+                    </select>
                 </div>
             </div>
-        </div>
 
-        <!-- Power Bar -->
-        <div id="power-bar-container" class="absolute bottom-10 left-1/2 transform -translate-x-1/2 w-64 h-6 bg-gray-900/80 border-2 border-white rounded-full overflow-hidden hidden z-40">
-            <div id="power-fill" class="h-full bg-gradient-to-r from-yellow-400 to-red-600 w-0 transition-all duration-75"></div>
-        </div>
-
-        <!-- Matchmaking Screen -->
-        <div id="matchmaking-screen" class="absolute inset-0 flex flex-col items-center justify-center bg-black/95 text-white z-50 hidden">
-            <div class="w-24 h-24 rounded-full border-4 border-green-500 flex items-center justify-center mb-6 searching-pulse">
-                <svg class="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-            </div>
-            <h2 class="text-3xl font-bold mb-2">Procurando Oponente...</h2>
-            <p id="match-status" class="text-gray-400">Conectando ao servidor...</p>
-            <button id="btn-cancel-match" class="mt-8 px-6 py-2 border border-red-500 text-red-500 rounded hover:bg-red-500 hover:text-white transition">Cancelar</button>
-        </div>
-
-        <!-- HUD -->
-        <div id="hud" class="absolute top-0 left-0 w-full p-4 flex justify-between items-start pointer-events-none hidden z-30">
-            <!-- Player Score -->
-            <div class="flex flex-col items-center">
-                <div class="text-xs text-blue-300 font-bold tracking-wider mb-1 bg-black/50 px-2 rounded" id="p1-name">VOCÊ</div>
-                <div class="bg-blue-900/90 text-white text-5xl font-black px-6 py-2 rounded-lg border-b-4 border-blue-600 shadow-xl min-w-[80px] text-center" id="score-home">0</div>
-            </div>
-
-            <!-- Timer & Info -->
-            <div class="flex flex-col items-center gap-2">
-                <div class="bg-gray-900/90 text-white font-mono text-3xl px-6 py-2 rounded-b-xl border-x-2 border-b-2 border-green-500 shadow-xl" id="timer">
-                    00:00
-                </div>
-                <div id="game-info" class="text-xs font-bold text-yellow-400 bg-black/60 px-3 py-1 rounded-full uppercase hidden">Prorrogação</div>
-            </div>
-
-            <!-- CPU/Opponent Score -->
-            <div class="flex flex-col items-center">
-                <div class="text-xs text-red-300 font-bold tracking-wider mb-1 bg-black/50 px-2 rounded" id="p2-name">ADVERSÁRIO</div>
-                <div class="bg-red-900/90 text-white text-5xl font-black px-6 py-2 rounded-lg border-b-4 border-red-600 shadow-xl min-w-[80px] text-center" id="score-away">0</div>
+            <div class="flex gap-4">
+                <button onclick="closeModal('createRoomModal')" class="mc-btn flex-1 bg-red-800 text-red-200">CANCELAR</button>
+                <button onclick="startGame()" class="mc-btn flex-1 text-green-400">INICIAR</button>
             </div>
         </div>
-
-        <!-- Goal Overlay -->
-        <div id="notification-overlay" class="absolute inset-0 flex items-center justify-center pointer-events-none hidden z-40 bg-black/20 backdrop-blur-[2px]">
-            <div class="transform -rotate-6 text-center">
-                <h1 id="notification-text" class="text-9xl font-black text-yellow-400 drop-shadow-[0_10px_0_rgba(0,0,0,1)] stroke-black animate-goal" style="-webkit-text-stroke: 4px black;">GOL!!!</h1>
-                <p id="scorer-name" class="text-4xl font-bold text-white text-shadow mt-4"></p>
-            </div>
-        </div>
-        
-        <!-- Waiting for Opponent Overlay (In-game) -->
-        <div id="waiting-overlay" class="absolute inset-0 flex items-center justify-center z-50 bg-black/80 hidden">
-            <h2 class="text-2xl text-white font-bold">Aguardando Oponente...</h2>
-        </div>
-
-        <!-- Mobile Controls -->
-        <div id="mobile-controls" class="absolute bottom-6 left-0 w-full flex justify-between px-8 md:hidden z-30 pointer-events-auto">
-            <div id="joystick-area" class="w-36 h-36 bg-white/10 rounded-full border-2 border-white/20 backdrop-blur-sm relative shadow-lg">
-                <div id="joystick-knob" class="w-14 h-14 bg-white/90 rounded-full absolute top-11 left-11 shadow-xl border-2 border-gray-300"></div>
-            </div>
-            <button id="kick-btn" class="w-28 h-28 bg-gradient-to-br from-red-500 to-red-600 rounded-full border-4 border-red-400 active:scale-95 transition shadow-2xl flex items-center justify-center relative overflow-hidden group">
-                <span class="absolute inset-0 bg-white/20 group-active:bg-transparent"></span>
-                <span class="font-black text-white text-xl tracking-wider">CHUTE</span>
-            </button>
-        </div>
-
     </div>
 
-    <!-- Initialization Scripts -->
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
-                "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"
+    <!-- SETTINGS MODAL -->
+    <div id="settingsModal" class="ui-layer items-center justify-center bg-black/80 z-50">
+        <div class="mc-panel p-8 w-[500px]">
+            <h2 class="text-4xl text-center text-white mb-6">CONFIGURAÇÕES</h2>
+            
+            <div class="space-y-6 mb-8">
+                <div class="flex justify-between items-center">
+                    <span class="text-2xl">Sensibilidade do Mouse</span>
+                    <input type="range" min="1" max="10" value="5" class="accent-yellow-500 w-32">
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-2xl">Volume da Música</span>
+                    <input type="range" min="0" max="100" value="50" class="accent-yellow-500 w-32">
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-2xl">Visualização</span>
+                    <select class="mc-input" id="viewModeSelect" onchange="updateViewMode(this.value)">
+                        <option value="third">3ª Pessoa</option>
+                        <option value="first">1ª Pessoa</option>
+                    </select>
+                </div>
+            </div>
+
+            <button onclick="closeModal('settingsModal')" class="mc-btn w-full">SALVAR E VOLTAR</button>
+        </div>
+    </div>
+
+    <!-- GAME HUD -->
+    <div id="gameHUD" class="ui-layer flex-col justify-between p-4 pointer-events-none">
+        <!-- Top Stats -->
+        <div class="flex justify-between items-start pointer-events-auto">
+            <div class="flex gap-4">
+                <div class="flex flex-col gap-1">
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">❤️</span>
+                        <div class="w-64 h-6 bg-gray-800 hud-bar relative">
+                            <div id="healthBar" class="h-full bg-red-600 transition-all duration-200" style="width: 100%;"></div>
+                            <span id="healthText" class="absolute inset-0 flex items-center justify-center text-sm font-bold shadow-black drop-shadow-md">100/100</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">⚡</span>
+                        <div class="w-48 h-4 bg-gray-800 hud-bar relative">
+                            <div id="manaBar" class="h-full bg-blue-600 transition-all duration-200" style="width: 100%;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col items-end">
+                <div class="text-4xl font-bold text-yellow-400 drop-shadow-md">SCORE: <span id="scoreVal">0</span></div>
+                <div class="text-2xl text-purple-300">WAVE <span id="waveVal">1</span></div>
+            </div>
+        </div>
+
+        <!-- Spell Flash -->
+        <div id="spellFlash" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-6xl font-bold text-white hidden pointer-events-none transition-all duration-200 text-shadow-lg">
+            FIREBALL!
+        </div>
+
+        <!-- Mic Button & Spell Book Toggle -->
+        <div class="pointer-events-auto flex items-end justify-center pb-8 gap-4">
+            <div class="spell-book hidden" id="spellBookPanel">
+                <h3 class="text-yellow-400 border-b border-gray-500 mb-2">GRIMÓRIO</h3>
+                <ul class="text-sm space-y-1" id="spellList">
+                    <!-- Spells injected by JS -->
+                </ul>
+            </div>
+
+            <button onclick="toggleSpellBook()" class="mc-btn text-sm py-2 px-4 h-12">📖 GRIMÓRIO (TAB)</button>
+            
+            <button id="micBtn" class="mc-btn rounded-full w-20 h-20 flex items-center justify-center border-4 border-white shadow-lg bg-red-600 hover:bg-red-500 active:scale-95 transition-all">
+                <span class="text-4xl">🎤</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Pause Menu -->
+    <div id="pauseMenu" class="ui-layer items-center justify-center bg-black/60 z-50 hidden">
+        <div class="mc-panel p-8 text-center">
+            <h2 class="text-4xl mb-4">PAUSADO</h2>
+            <button onclick="resumeGame()" class="mc-btn block w-full mb-2">CONTINUAR</button>
+            <button onclick="returnToLobby()" class="mc-btn block w-full bg-red-900">SAIR PARA LOBBY</button>
+        </div>
+    </div>
+
+    <script>
+        // ==================== STATE MANAGEMENT ====================
+        const STATE = {
+            LOBBY: 'lobby',
+            PLAYING: 'playing',
+            PAUSED: 'paused'
+        };
+        let currentState = STATE.LOBBY;
+        let isViewThirdPerson = true;
+
+        // ==================== THREE.JS SETUP ====================
+        const container = document.getElementById('gameContainer');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); // Sky blue
+        scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
+
+        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: false }); // False for retro look
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // ==================== TEXTURES GENERATOR ====================
+        function createPixelTexture(color, noise = 0.1) {
+            const size = 64;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = color;
+            ctx.fillRect(0, 0, size, size);
+            
+            for(let i=0; i<size*size*2; i++) {
+                const x = Math.floor(Math.random() * size);
+                const y = Math.floor(Math.random() * size);
+                const shade = (Math.random() - 0.5) * noise * 255;
+                ctx.fillStyle = `rgba(0,0,0,${Math.random() * noise})`;
+                if(Math.random() > 0.5) ctx.fillStyle = `rgba(255,255,255,${Math.random() * noise})`;
+                ctx.fillRect(x, y, 1, 1);
             }
+            
+            // Draw border for block effect
+            ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(0,0,size,size);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.magFilter = THREE.NearestFilter;
+            texture.minFilter = THREE.NearestFilter;
+            return texture;
         }
-    </script>
 
-    <script type="module">
-        import * as THREE from 'three';
-        import { initializeApp } from 'firebase/app';
-        import { getDatabase, ref, set, onValue, push, remove, onDisconnect, update, get } from 'firebase/database';
-
-        // --- Firebase Configuration ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyDsDeOjhkkKtXK8kBpuVORQ1FTI_EdBTdU",
-            authDomain: "pobrecraft-c517c.firebaseapp.com",
-            projectId: "pobrecraft-c517c",
-            storageBucket: "pobrecraft-c517c.firebasestorage.app",
-            messagingSenderId: "906438912132",
-            appId: "1:906438912132:web:a3d9827600d3c0a52dbad1"
+        const textures = {
+            grass: createPixelTexture('#567d46', 0.2),
+            dirt: createPixelTexture('#3d2817', 0.2),
+            stone: createPixelTexture('#7a7a7a', 0.15),
+            wood: createPixelTexture('#5c4033', 0.1),
+            leaves: createPixelTexture('#2d4c1e', 0.3),
+            skin: createPixelTexture('#ffccaa', 0.05),
+            robe: createPixelTexture('#4b0082', 0.1),
+            gold: createPixelTexture('#ffd700', 0.1)
         };
 
-        let app, db;
-        try {
-            app = initializeApp(firebaseConfig);
-            db = getDatabase(app);
-            console.log("Firebase initialized");
-        } catch (e) {
-            console.error("Firebase init failed:", e);
-            alert("Erro ao conectar no serviço online. O modo offline ainda funcionará.");
-        }
+        // ==================== LIGHTING ====================
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
 
-        // --- Game Constants & Globals ---
-        const FIELD_WIDTH = 34;
-        const FIELD_LENGTH = 54;
-        const GOAL_WIDTH = 10;
-        
-        // Settings
-        let GAME_MODE = '1v1'; // 1v1, 2v2, 5v5
-        let IS_MULTIPLAYER = false;
-        let PLAYER_NAME = "Jogador 1";
-        let PLAYER_ID = 'player_' + Math.random().toString(36).substr(2, 9);
-        let MATCH_ID = null;
-        let IS_HOST = false; // Player 1 is host (physics authority)
-        
-        // Physics
-        const PHYSICS_RATE = 1/60;
-        let physicsAccumulator = 0;
-        
-        // THREE globals
-        let scene, camera, renderer;
-        let fieldGroup, ballMesh;
-        
-        // Entities
-        let players = []; // Array of { mesh, data, role, team }
-        // Team 0 = Blue (Bottom/Positive Z goal), Team 1 = Red (Top/Negative Z goal)
-        // Note: Blue defends Positive Z, attacks Negative Z. Red defends Negative Z, attacks Positive Z.
-        
-        let ball = { x: 0, y: 0.7, z: 0, vx: 0, vy: 0, vz: 0, radius: 0.7 };
-        
-        // Game State
-        let gameState = {
-            scoreRed: 0,
-            scoreBlue: 0,
-            time: 0,
-            isPlaying: false,
-            phase: 'menu' // menu, matchmaking, game
-        };
+        const sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        sunLight.position.set(50, 100, 50);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 0.5;
+        sunLight.shadow.camera.far = 200;
+        sunLight.shadow.camera.left = -100;
+        sunLight.shadow.camera.right = 100;
+        sunLight.shadow.camera.top = 100;
+        sunLight.shadow.camera.bottom = -100;
+        scene.add(sunLight);
 
-        // Inputs
-        const keys = { w: false, a: false, s: false, d: false, space: false };
-        let mouse = { left: false, right: false };
-        let kickCharge = 0;
-        let isCharging = false;
-        let joystickVector = { x: 0, y: 0 };
+        // ==================== WORLD ====================
+        const groundGeo = new THREE.BoxGeometry(200, 1, 200);
+        const groundMat = new THREE.MeshStandardMaterial({ map: textures.grass });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.position.y = -0.5;
+        ground.receiveShadow = true;
+        scene.add(ground);
 
-        // DOM
-        const uiMenu = document.getElementById('main-menu');
-        const uiMatchmaking = document.getElementById('matchmaking-screen');
-        const uiHud = document.getElementById('hud');
-        const uiWaiting = document.getElementById('waiting-overlay');
-        const uiStatus = document.getElementById('match-status');
-        
-        // --- Initialization ---
-        function init() {
-            setupThreeJS();
-            setupInputs();
-            setupUI();
-            animate();
-        }
-
-        function setupThreeJS() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87ceeb); // Sky Blue
-            scene.fog = null;
-
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 55, 45); // Camera mais alta e inclinada
-            camera.lookAt(0, 0, 0);
-
-            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            document.getElementById('game-container').appendChild(renderer.domElement);
-
-            // Lights
-            const ambient = new THREE.AmbientLight(0xffffff, 0.5);
-            scene.add(ambient);
-            
-            const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-            sun.position.set(-30, 60, 20);
-            sun.castShadow = true;
-            sun.shadow.mapSize.width = 2048;
-            sun.shadow.mapSize.height = 2048;
-            sun.shadow.camera.left = -40;
-            sun.shadow.camera.right = 40;
-            sun.shadow.camera.top = 40;
-            sun.shadow.camera.bottom = -40;
-            scene.add(sun);
-
-            createStadium();
-            createBall();
-        }
-
-        function createStadium() {
-            fieldGroup = new THREE.Group();
-            scene.add(fieldGroup);
-
-            // Grass
-            const grassGeo = new THREE.PlaneGeometry(FIELD_WIDTH + 10, FIELD_LENGTH + 10);
-            const grassMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8 });
-            const ground = new THREE.Mesh(grassGeo, grassMat);
-            ground.rotation.x = -Math.PI / 2;
-            ground.receiveShadow = true;
-            fieldGroup.add(ground);
-
-            // Lines
-            const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff, opacity: 0.6, transparent: true });
-            const createLine = (w, l, x, z) => {
-                const m = new THREE.Mesh(new THREE.PlaneGeometry(w, l), lineMat);
-                m.rotation.x = -Math.PI / 2;
-                m.position.set(x, 0.05, z);
-                fieldGroup.add(m);
-            }
-            
-            // Borders
-            createLine(FIELD_WIDTH, 0.5, 0, FIELD_LENGTH/2);
-            createLine(FIELD_WIDTH, 0.5, 0, -FIELD_LENGTH/2);
-            createLine(0.5, FIELD_LENGTH, FIELD_WIDTH/2, 0);
-            createLine(0.5, FIELD_LENGTH, -FIELD_WIDTH/2, 0);
-            createLine(FIELD_WIDTH, 0.5, 0, 0); // Center
-
-            // Circle
-            const ring = new THREE.Mesh(new THREE.RingGeometry(5, 5.2, 32), lineMat);
-            ring.rotation.x = -Math.PI / 2;
-            ring.position.y = 0.05;
-            fieldGroup.add(ring);
-
-            // Goals
-            const createGoal = (z, isBlue) => {
-                const goalGroup = new THREE.Group();
-                goalGroup.position.z = z;
-                
-                const postMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-                const netMat = new THREE.MeshBasicMaterial({ color: isBlue ? 0x3b82f6 : 0xef4444, wireframe: true, transparent: true, opacity: 0.3 });
-                
-                // Posts
-                const p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 4), postMat);
-                p1.position.set(-GOAL_WIDTH/2, 2, 0);
-                const p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 4), postMat);
-                p2.position.set(GOAL_WIDTH/2, 2, 0);
-                const cross = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, GOAL_WIDTH), postMat);
-                cross.rotation.z = Math.PI/2;
-                cross.position.set(0, 4, 0);
-                
-                // Net
-                const net = new THREE.Mesh(new THREE.BoxGeometry(GOAL_WIDTH, 4, 3), netMat);
-                net.position.set(0, 2, z > 0 ? 1.5 : -1.5);
-                
-                goalGroup.add(p1, p2, cross, net);
-                fieldGroup.add(goalGroup);
-            };
-            
-            createGoal(-FIELD_LENGTH/2, false); // Red Goal (Top)
-            createGoal(FIELD_LENGTH/2, true);  // Blue Goal (Bottom)
-        }
-
-        function createBall() {
-            const geom = new THREE.IcosahedronGeometry(ball.radius, 2);
-            // Vertex colors for pattern
-            const colors = [];
-            const pos = geom.getAttribute('position');
-            for(let i=0; i < pos.count; i+=3) {
-                const c = Math.random() > 0.6 ? 0.1 : 1.0;
-                colors.push(c,c,c, c,c,c, c,c,c);
-            }
-            geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-            
-            const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4 });
-            ballMesh = new THREE.Mesh(geom, mat);
-            ballMesh.castShadow = true;
-            ballMesh.receiveShadow = true;
-            scene.add(ballMesh);
-        }
-
-        // --- Detailed Player Creation ---
-        function createPlayerMesh(teamColor) {
+        // Decor: Trees & Rocks
+        function createTree(x, z) {
             const group = new THREE.Group();
-
-            // Materials
-            const skinMat = new THREE.MeshStandardMaterial({ color: 0xffdbac }); // Skin
-            const shirtMat = new THREE.MeshStandardMaterial({ color: teamColor }); // Jersey
-            const shortsMat = new THREE.MeshStandardMaterial({ color: 0xffffff }); // White shorts
-            const socksMat = new THREE.MeshStandardMaterial({ color: teamColor });
-            const bootMat = new THREE.MeshStandardMaterial({ color: 0x111111 }); // Black boots
-
-            // Head
-            const head = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16), skinMat);
-            head.position.y = 3.6;
-            head.castShadow = true;
-            group.add(head);
-
-            // Torso
-            const torso = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.4, 0.6), shirtMat);
-            torso.position.y = 2.5;
-            torso.castShadow = true;
-            group.add(torso);
-
-            // Arms
-            const createLimb = (x, y, mat, w, h) => {
-                const limb = new THREE.Mesh(new THREE.CylinderGeometry(w, w*0.8, h, 8), mat);
-                limb.position.set(x, y, 0);
-                limb.castShadow = true;
-                return limb;
-            };
-
-            const leftArm = createLimb(-0.8, 2.5, skinMat, 0.18, 1.3);
-            const rightArm = createLimb(0.8, 2.5, skinMat, 0.18, 1.3);
-            // Sleeve
-            leftArm.add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.4, 8), shirtMat).translateY(0.4));
-            rightArm.add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.4, 8), shirtMat).translateY(0.4));
             
-            group.add(leftArm);
-            group.add(rightArm);
-            
-            // Legs pivot group (hips)
-            const hips = new THREE.Group();
-            hips.position.y = 1.8;
-            group.add(hips);
-            
-            // Shorts part of torso/hips
-            const shorts = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.6, 0.7), shortsMat);
-            shorts.position.y = 0;
-            hips.add(shorts);
+            // Trunk
+            const trunkGeo = new THREE.BoxGeometry(1, 4, 1);
+            const trunkMat = new THREE.MeshStandardMaterial({ map: textures.wood });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 2;
+            trunk.castShadow = true;
+            group.add(trunk);
 
-            const leftLeg = createLimb(-0.3, -0.9, socksMat, 0.2, 1.5);
-            const rightLeg = createLimb(0.3, -0.9, socksMat, 0.2, 1.5);
-            
-            // Shoes
-            leftLeg.add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.5), bootMat).translateY(-0.8).translateZ(0.15));
-            rightLeg.add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.5), bootMat).translateY(-0.8).translateZ(0.15));
+            // Leaves
+            const leavesGeo = new THREE.BoxGeometry(3, 3, 3);
+            const leavesMat = new THREE.MeshStandardMaterial({ map: textures.leaves });
+            const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+            leaves.position.y = 5;
+            leaves.castShadow = true;
+            group.add(leaves);
 
-            hips.add(leftLeg);
-            hips.add(rightLeg);
-
-            // Store references for animation
-            group.userData = { leftLeg, rightLeg, leftArm, rightArm };
+            group.position.set(x, 0, z);
+            scene.add(group);
             return group;
         }
 
-        // --- Game Logic ---
-        function startGame(mode, isMultiplayer) {
-            GAME_MODE = mode;
-            IS_MULTIPLAYER = isMultiplayer;
-            gameState.isPlaying = true;
-            gameState.scoreBlue = 0;
-            gameState.scoreRed = 0;
-            gameState.time = 0;
-            
-            // Clean up old players
-            players.forEach(p => scene.remove(p.mesh));
-            players = [];
+        for(let i=0; i<30; i++) {
+            const x = (Math.random() - 0.5) * 180;
+            const z = (Math.random() - 0.5) * 180;
+            if(Math.abs(x) > 10 || Math.abs(z) > 10) createTree(x, z);
+        }
 
-            // Define teams
-            const teamSize = mode === '5v5' ? 5 : (mode === '2v2' ? 2 : 1);
+        // ==================== PLAYER (WIZARD) ====================
+        const player = {
+            mesh: new THREE.Group(),
+            yaw: new THREE.Group(),
+            pitch: new THREE.Group(),
+            velocity: new THREE.Vector3(),
+            direction: new THREE.Vector3(),
+            speed: 0.3,
+            health: 100,
+            score: 0
+        };
+
+        // Construct Voxel Wizard
+        function createVoxelWizard() {
+            const group = new THREE.Group();
             
-            // Spawn logic
-            const spawnTeam = (teamId) => {
-                const color = teamId === 0 ? 0x3b82f6 : 0xef4444; // Blue : Red
-                const zStart = teamId === 0 ? 20 : -20;
+            // Body
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1, 1.5, 0.6), new THREE.MeshStandardMaterial({ map: textures.robe }));
+            body.position.y = 0.75;
+            body.castShadow = true;
+            group.add(body);
+
+            // Head
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), new THREE.MeshStandardMaterial({ map: textures.skin }));
+            head.position.y = 1.9;
+            head.castShadow = true;
+            group.add(head);
+
+            // Hat
+            const hatBase = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 1.2), new THREE.MeshStandardMaterial({ map: textures.robe }));
+            hatBase.position.y = 2.4;
+            group.add(hatBase);
+            const hatTop = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1, 0.6), new THREE.MeshStandardMaterial({ map: textures.robe }));
+            hatTop.position.y = 2.9;
+            group.add(hatTop);
+
+            // Staff
+            const staffHandle = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2, 0.1), new THREE.MeshStandardMaterial({ map: textures.wood }));
+            staffHandle.position.set(0.6, 1, 0.4);
+            staffHandle.rotation.x = 0.2;
+            group.add(staffHandle);
+            
+            const staffOrb = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 0.5 }));
+            staffOrb.position.set(0.6, 2.1, 0.5);
+            group.add(staffOrb);
+
+            return group;
+        }
+
+        const wizardMesh = createVoxelWizard();
+        player.mesh.add(wizardMesh);
+        
+        // Setup Camera Hierarchy for Pointer Lock
+        // player.yaw rotates Y (left/right)
+        // player.pitch rotates X (up/down) attached to yaw
+        scene.add(player.yaw);
+        player.yaw.add(player.pitch);
+        
+        // Add player mesh to Yaw so it rotates with look
+        player.yaw.add(player.mesh);
+        
+        // Initial Camera Pos
+        player.pitch.add(camera);
+        camera.position.set(0, 3, 5); // Third person default
+        camera.lookAt(0, 2, 0);
+
+        // ==================== CONTROLS (POINTER LOCK) ====================
+        const keys = { w: false, a: false, s: false, d: false };
+        
+        document.addEventListener('keydown', (e) => {
+            const k = e.key.toLowerCase();
+            if(keys.hasOwnProperty(k)) keys[k] = true;
+            if(k === 'tab') { e.preventDefault(); toggleSpellBook(); }
+            if(k === 'escape') {
+                if(currentState === STATE.PLAYING) pauseGame();
+                else if(currentState === STATE.PAUSED) resumeGame();
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if(keys.hasOwnProperty(k)) keys[k] = false;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (currentState !== STATE.PLAYING) return;
+            
+            const sensitivity = 0.002;
+            player.yaw.rotation.y -= e.movementX * sensitivity;
+            player.pitch.rotation.x -= e.movementY * sensitivity;
+            
+            // Clamp pitch
+            player.pitch.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, player.pitch.rotation.x));
+        });
+
+        // Request pointer lock on click if playing
+        container.addEventListener('click', () => {
+            if (currentState === STATE.PLAYING) {
+                container.requestPointerLock();
+            }
+        });
+
+        // ==================== UI FUNCTIONS ====================
+        function openModal(id) {
+            document.getElementById(id).style.display = 'flex';
+        }
+        
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        function quickPlay() {
+            startGame();
+        }
+
+        function startGame() {
+            closeModal('createRoomModal');
+            document.getElementById('lobbyScreen').classList.remove('active');
+            document.getElementById('gameHUD').classList.add('active');
+            document.getElementById('crosshair').style.display = 'block';
+            
+            currentState = STATE.PLAYING;
+            container.requestPointerLock();
+            
+            // Reset player pos
+            player.yaw.position.set(0, 0, 0);
+            player.yaw.rotation.set(0, 0, 0);
+            player.pitch.rotation.set(0, 0, 0);
+            player.health = 100;
+            player.score = 0;
+            
+            updateViewMode(document.getElementById('viewModeSelect').value);
+            spawnInitialEnemies();
+        }
+
+        function pauseGame() {
+            currentState = STATE.PAUSED;
+            document.exitPointerLock();
+            document.getElementById('pauseMenu').style.display = 'flex';
+        }
+
+        function resumeGame() {
+            currentState = STATE.PLAYING;
+            document.getElementById('pauseMenu').style.display = 'none';
+            container.requestPointerLock();
+        }
+
+        function returnToLobby() {
+            currentState = STATE.LOBBY;
+            document.getElementById('pauseMenu').style.display = 'none';
+            document.getElementById('gameHUD').classList.remove('active');
+            document.getElementById('lobbyScreen').classList.add('active');
+            document.getElementById('crosshair').style.display = 'none';
+            
+            // Reset Camera for Lobby
+            player.yaw.rotation.set(0, 0, 0);
+            player.pitch.rotation.set(0, 0, 0);
+            camera.position.set(0, 2, 6);
+            camera.lookAt(0, 1.5, 0);
+            
+            // Clear enemies
+            enemies.forEach(e => scene.remove(e.mesh));
+            enemies = [];
+        }
+
+        function updateViewMode(mode) {
+            isViewThirdPerson = (mode === 'third');
+            if(isViewThirdPerson) {
+                camera.position.set(0, 3, 5);
+                player.mesh.visible = true;
+            } else {
+                camera.position.set(0, 2, 0.5);
+                player.mesh.visible = false;
+            }
+        }
+
+        function toggleSpellBook() {
+            const panel = document.getElementById('spellBookPanel');
+            panel.classList.toggle('hidden');
+        }
+
+        // ==================== VOICE & SPELLS ====================
+        const spells = {
+            'fogo': { color: 0xff4400, type: 'projectile', speed: 1.0, damage: 25 },
+            'fire': { color: 0xff4400, type: 'projectile', speed: 1.0, damage: 25 },
+            'gelo': { color: 0x00ffff, type: 'projectile', speed: 1.2, damage: 20 },
+            'ice': { color: 0x00ffff, type: 'projectile', speed: 1.2, damage: 20 },
+            'raio': { color: 0xffff00, type: 'instant', range: 20, damage: 40 },
+            'thunder': { color: 0xffff00, type: 'instant', range: 20, damage: 40 },
+            'cura': { color: 0x00ff00, type: 'self', heal: 30 },
+            'heal': { color: 0x00ff00, type: 'self', heal: 30 },
+            'escudo': { color: 0x0000ff, type: 'buff', duration: 5000 }
+        };
+
+        // Populate spell list UI
+        const spellListEl = document.getElementById('spellList');
+        Object.keys(spells).forEach(spell => {
+            if(spellListEl.innerHTML.includes(spells[spell].color)) return; // Avoid duplicates
+            const li = document.createElement('li');
+            li.innerHTML = `<span style="color:#${spells[spell].color.toString(16)}">■</span> ${spell.toUpperCase()}`;
+            spellListEl.appendChild(li);
+        });
+
+        let recognition;
+        let isListening = false;
+
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = false;
+            recognition.lang = 'pt-BR';
+
+            recognition.onresult = (event) => {
+                const last = event.results.length - 1;
+                const command = event.results[last][0].transcript.trim().toLowerCase().split(' ')[0];
+                console.log('Voice:', command);
                 
-                for(let i=0; i<teamSize; i++) {
-                    const isBot = IS_MULTIPLAYER ? (teamId === 0 ? (i > 0) : true) : (teamId === 1 || i > 0);
-                    // In 1v1 MP: Team 0 Player 0 is Local, Team 1 Player 0 is Remote.
-                    // If Host: I am T0P0. Remote is T1P0.
-                    // If Guest: I am T1P0. Remote is T0P0.
-                    
-                    let role = 'bot';
-                    let label = "CPU";
-
-                    if (!IS_MULTIPLAYER) {
-                        if (teamId === 0 && i === 0) { role = 'local'; label = PLAYER_NAME; }
-                    } else {
-                        // Multiplayer logic
-                        if (IS_HOST) {
-                            if (teamId === 0 && i === 0) { role = 'local'; label = PLAYER_NAME; }
-                            else if (teamId === 1 && i === 0) { role = 'remote'; label = "Oponente"; }
-                        } else {
-                            if (teamId === 1 && i === 0) { role = 'local'; label = PLAYER_NAME; }
-                            else if (teamId === 0 && i === 0) { role = 'remote'; label = "Oponente"; }
-                        }
-                    }
-
-                    // Spread formation
-                    const xOff = (i % 3) * 6 * (i%2==0?1:-1);
-                    const zOff = Math.floor(i/3) * 8 * (teamId===0?-1:1);
-
-                    const p = {
-                        mesh: createPlayerMesh(color),
-                        x: xOff,
-                        z: zStart + zOff,
-                        vx: 0, vz: 0,
-                        angle: teamId === 0 ? Math.PI : 0,
-                        team: teamId,
-                        role: role,
-                        id: `${teamId}-${i}`,
-                        label: label
-                    };
-                    
-                    // Add Name Tag
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    canvas.width = 256; canvas.height = 64;
-                    ctx.fillStyle = "rgba(0,0,0,0.5)";
-                    ctx.fillRect(0,0,256,64);
-                    ctx.fillStyle = "white";
-                    ctx.font = "bold 40px Arial";
-                    ctx.textAlign = "center";
-                    ctx.textBaseline = "middle";
-                    ctx.fillText(label, 128, 32);
-                    
-                    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true }));
-                    sprite.position.y = 5.5;
-                    sprite.scale.set(4, 1, 1);
-                    p.mesh.add(sprite);
-
-                    scene.add(p.mesh);
-                    players.push(p);
+                if (spells[command]) {
+                    castSpell(command);
                 }
             };
 
-            spawnTeam(0);
-            spawnTeam(1);
-            
-            resetBall();
-            updateUI();
-        }
-        
-        function resetPositions() {
-            players.forEach(p => {
-               const zStart = p.team === 0 ? 20 : -20;
-               // Simple reset to start pos logic needs index, but for now just push back
-               p.z = zStart;
-               p.x = (Math.random() - 0.5) * 10;
-               p.vx = 0; p.vz = 0;
-            });
-            resetBall();
+            recognition.onend = () => { if(isListening) recognition.start(); };
         }
 
-        function resetBall() {
-            ball.x = 0; ball.z = 0; ball.y = 10; ball.vx = 0; ball.vz = 0; ball.vy = 0; // Drop ball from sky
-        }
-
-        // --- Physics & Updates ---
-        
-        function updateGame(dt) {
-            if (!gameState.isPlaying) return;
-            
-            // Timer
-            if (IS_HOST || !IS_MULTIPLAYER) {
-                gameState.time += dt;
-            }
-
-            // Charging Logic
-            if (isCharging) {
-                kickCharge = Math.min(kickCharge + 1, 60); // Charge up to 60 frames
-            }
-
-            // Controls for Local Player
-            const localP = players.find(p => p.role === 'local');
-            if (localP) {
-                const speed = 12;
-                let dx = 0, dz = 0;
-
-                if (keys.w) dz -= 1;
-                if (keys.s) dz += 1;
-                if (keys.a) dx -= 1;
-                if (keys.d) dx += 1;
-                
-                // Joystick
-                if (joystickVector.x !== 0 || joystickVector.y !== 0) {
-                    dx = joystickVector.x;
-                    dz = joystickVector.y;
-                }
-
-                if (dx !== 0 || dz !== 0) {
-                    const len = Math.sqrt(dx*dx + dz*dz);
-                    localP.vx = (dx/len) * speed;
-                    localP.vz = (dz/len) * speed;
-                    localP.angle = Math.atan2(localP.vx, localP.vz);
-                } else {
-                    localP.vx = 0;
-                    localP.vz = 0;
-                }
-                
-                // Multiplayer: Send Data
-                if (IS_MULTIPLAYER && MATCH_ID) {
-                    const updates = {};
-                    // Usando o path unificado matchmaking/ID/game
-                    updates[`matchmaking/${MATCH_ID}/game/players/${localP.id}`] = {
-                        x: localP.x, z: localP.z,
-                        vx: localP.vx, vz: localP.vz,
-                        angle: localP.angle,
-                        kicking: keys.space
-                    };
-                    update(ref(db), updates);
-                }
-            }
-            
-            // Physics Update (Host or Singleplayer handles ball & bots)
-            if (!IS_MULTIPLAYER || IS_HOST) {
-                
-                // Ball Physics
-                ball.x += ball.vx * dt * 60;
-                ball.z += ball.vz * dt * 60;
-                ball.y += ball.vy * dt * 60;
-                
-                // Gravity
-                if (ball.y > ball.radius) {
-                    ball.vy -= 0.04; // Gravity
-                } else {
-                    // Ground Bounce
-                    ball.y = ball.radius;
-                    if (Math.abs(ball.vy) > 0.1) {
-                        ball.vy *= -0.6; // Bounciness
-                    } else {
-                        ball.vy = 0;
-                    }
-                }
-
-                // Friction
-                if (ball.y <= ball.radius + 0.1) {
-                    ball.vx *= 0.97;
-                    ball.vz *= 0.97;
-                } else {
-                    ball.vx *= 0.99; // Air resistance
-                    ball.vz *= 0.99;
-                }
-                
-                // Goal Checks
-                if (Math.abs(ball.z) > FIELD_LENGTH/2 - ball.radius) {
-                    if (Math.abs(ball.x) < GOAL_WIDTH/2) {
-                        // Goal (Height check < 4)
-                        if (ball.y < 4) {
-                            if (ball.z > 0) scoreGoal(1); // Red Scored
-                            else scoreGoal(0); // Blue Scored
-                        } else {
-                             // Hit crossbar or went over
-                             if (ball.z > 0) ball.z = FIELD_LENGTH/2 - ball.radius;
-                             else ball.z = -FIELD_LENGTH/2 + ball.radius;
-                             ball.vz *= -0.5;
-                        }
-                    } else {
-                        // Wall bounce
-                         if (ball.z > 0) ball.z = FIELD_LENGTH/2 - ball.radius;
-                         else ball.z = -FIELD_LENGTH/2 + ball.radius;
-                         ball.vz *= -0.8;
-                    }
-                }
-                
-                // Side Walls
-                if (Math.abs(ball.x) > FIELD_WIDTH/2 - ball.radius) {
-                    ball.x = Math.sign(ball.x) * (FIELD_WIDTH/2 - ball.radius);
-                    ball.vx *= -0.8;
-                }
-                
-                // Player & Bot Logic
-                players.forEach(p => {
-                    // Bot Logic
-                    if (p.role === 'bot') {
-                        // Simple AI
-                        const distToBall = Math.hypot(ball.x - p.x, ball.z - p.z);
-                        let tx = ball.x;
-                        let tz = ball.z;
-                        
-                        // Defense bias if ball is far on own side
-                        const ownGoalZ = p.team === 0 ? 25 : -25;
-                        
-                        // Move towards ball
-                        let dx = tx - p.x;
-                        let dz = tz - p.z;
-                        const len = Math.sqrt(dx*dx + dz*dz);
-                        const speed = 10;
-                        if(len > 0.1) {
-                            p.vx = (dx/len) * speed;
-                            p.vz = (dz/len) * speed;
-                            p.angle = Math.atan2(dx, dz);
-                        }
-                    }
-                    
-                    if (p.role !== 'remote') {
-                        p.x += p.vx * dt;
-                        p.z += p.vz * dt;
-                        
-                        // Bounds
-                        p.x = Math.max(-FIELD_WIDTH/2+1, Math.min(FIELD_WIDTH/2-1, p.x));
-                        p.z = Math.max(-FIELD_LENGTH/2+1, Math.min(FIELD_LENGTH/2-1, p.z));
-                    }
-
-                    // Collision with Ball
-                    const dist = Math.hypot(ball.x - p.x, ball.z - p.z);
-                    if (dist < 1.5) {
-                        // Calculate Kick Vector
-                        const nx = (ball.x - p.x) / dist;
-                        const nz = (ball.z - p.z) / dist;
-                        
-                        let power = 0.15; // Dribble default
-                        let lift = 0;
-
-                        if (p.role === 'local') {
-                            if (keys.space) {
-                                // Charge determines power AND height
-                                // Low charge = Ground pass (power 0.4, lift 0)
-                                // Med charge = Shot (power 0.8, lift 0.2)
-                                // High charge = Lob/Smash (power 1.2, lift 0.5)
-                                
-                                const chargePct = kickCharge / 60; // 0.0 to 1.0
-                                
-                                power = 0.4 + (chargePct * 1.0); // 0.4 to 1.4
-                                
-                                if (chargePct > 0.3) {
-                                    lift = chargePct * 0.6; // Up to 0.6 height force
-                                }
-                                
-                                // Right click forces chip shot
-                                if (mouse.right) {
-                                    lift += 0.3;
-                                    power *= 0.8;
-                                }
-                            }
-                        } else if (p.role === 'bot') {
-                            // Random strong kicks
-                            if (Math.random() < 0.05) {
-                                power = 0.9;
-                                lift = 0.3;
-                            }
-                        }
-
-                        // Apply
-                        ball.vx += nx * power;
-                        ball.vz += nz * power;
-                        ball.vy += lift;
-                        
-                        // Separate to avoid sticky
-                        ball.x += nx * 0.2;
-                        ball.z += nz * 0.2;
-                    }
-                });
-                
-                // Sync Ball & Score to Guest
-                if (IS_MULTIPLAYER && MATCH_ID) {
-                    update(ref(db, `matchmaking/${MATCH_ID}/game/state`), {
-                         ball: ball,
-                         score: { r: gameState.scoreRed, b: gameState.scoreBlue },
-                         time: gameState.time
-                    });
-                }
-
+        document.getElementById('micBtn').addEventListener('click', () => {
+            if(!recognition) { alert('Navegador não suporta voz'); return; }
+            const btn = document.getElementById('micBtn');
+            if(isListening) {
+                recognition.stop();
+                isListening = false;
+                btn.classList.remove('bg-green-600');
+                btn.classList.add('bg-red-600');
             } else {
-                // GUEST: Read physics from Host via listener (handled below)
-                // Just predict local movement for smoothness
-                if (localP) {
-                     localP.x += localP.vx * dt;
-                     localP.z += localP.vz * dt;
-                }
+                recognition.start();
+                isListening = true;
+                btn.classList.remove('bg-red-600');
+                btn.classList.add('bg-green-600');
             }
+        });
 
-            updateVisuals();
-        }
-
-        function updateVisuals() {
-            // Camera
-            let target;
-            const local = players.find(p => p.role === 'local');
-            if (local) {
-                target = new THREE.Vector3(local.x, 0, local.z);
-                target.lerp(new THREE.Vector3(ball.x, 0, ball.z), 0.3);
-            } else {
-                target = new THREE.Vector3(ball.x, 0, ball.z);
-            }
-            
-            camera.position.x += (target.x*0.6 - camera.position.x) * 0.1;
-            camera.lookAt(target.x * 0.2, 0, target.z * 0.1);
-            
-            // Objects
-            ballMesh.position.set(ball.x, ball.y, ball.z);
-            ballMesh.rotation.x += ball.vz * 0.2;
-            ballMesh.rotation.z -= ball.vx * 0.2;
-
-            players.forEach(p => {
-                p.mesh.position.set(p.x, 0, p.z);
-                p.mesh.rotation.y = p.angle;
-                
-                // Animation
-                const speed = Math.hypot(p.vx, p.vz);
-                if (speed > 0.1) {
-                    const t = performance.now() * 0.015;
-                    p.mesh.userData.leftLeg.rotation.x = Math.sin(t) * 0.6;
-                    p.mesh.userData.rightLeg.rotation.x = Math.sin(t + Math.PI) * 0.6;
-                    p.mesh.userData.leftArm.rotation.x = Math.sin(t + Math.PI) * 0.4;
-                    p.mesh.userData.rightArm.rotation.x = Math.sin(t) * 0.4;
-                } else {
-                     p.mesh.userData.leftLeg.rotation.x = 0;
-                     p.mesh.userData.rightLeg.rotation.x = 0;
-                     p.mesh.userData.leftArm.rotation.x = 0;
-                     p.mesh.userData.rightArm.rotation.x = 0;
-                }
-            });
-            
-            // HUD
-            const min = Math.floor(gameState.time / 60);
-            const sec = Math.floor(gameState.time % 60);
-            document.getElementById('timer').innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
-            document.getElementById('score-home').innerText = gameState.scoreBlue;
-            document.getElementById('score-away').innerText = gameState.scoreRed;
-            
-            // Update Power Bar
-            const bar = document.getElementById('power-bar-container');
-            if (isCharging) {
-                bar.classList.remove('hidden');
-                const pct = (kickCharge / 60) * 100;
-                document.getElementById('power-fill').style.width = `${pct}%`;
-            } else {
-                bar.classList.add('hidden');
-            }
-        }
+        // Spell Logic
+        let projectiles = [];
         
-        function scoreGoal(teamId) {
-             if (teamId === 0) gameState.scoreBlue++;
-             else gameState.scoreRed++;
-             
-             // Show notif
-             const txt = document.getElementById('notification-text');
-             const overlay = document.getElementById('notification-overlay');
-             const name = document.getElementById('scorer-name');
-             
-             overlay.classList.remove('hidden');
-             name.innerText = teamId === 0 ? "EQUIPE AZUL" : "EQUIPE VERMELHA";
-             name.className = `text-4xl font-bold mt-4 text-shadow ${teamId===0?'text-blue-500':'text-red-500'}`;
-             
-             gameState.isPlaying = false;
-             
-             // Check Winner (First to 5)
-             if (gameState.scoreBlue >= 5 || gameState.scoreRed >= 5) {
-                 const winner = gameState.scoreBlue >= 5 ? "AZUL" : "VERMELHO";
-                 txt.innerText = "FIM DE JOGO!";
-                 name.innerText = `VENCEDOR: ${winner}`;
-                 name.className = "text-4xl font-bold mt-4 text-shadow text-white";
-                 
-                 setTimeout(() => {
-                     overlay.classList.add('hidden');
-                     // Return to menu
-                     uiHud.classList.add('hidden');
-                     uiMenu.style.display = 'flex';
-                     
-                     if (IS_MULTIPLAYER && MATCH_ID) {
-                         // Cleanup
-                         remove(ref(db, `matchmaking/${MATCH_ID}`));
-                         window.location.reload();
-                     }
-                 }, 4000);
-             } else {
-                 setTimeout(() => {
-                     overlay.classList.add('hidden');
-                     resetPositions();
-                     gameState.isPlaying = true;
-                 }, 2500);
-             }
-        }
-
-        // --- Multiplayer Logic ---
-
-        function findMatch() {
-            uiMenu.style.display = 'none';
-            uiMatchmaking.style.display = 'flex';
-            uiMatchmaking.classList.remove('hidden');
-            uiStatus.innerText = "Buscando partidas disponíveis...";
-
-            const queueRef = ref(db, 'matchmaking');
+        function castSpell(name) {
+            const spell = spells[name];
             
-            // Cancel Button Logic (Global for this screen)
-            const cancelBtn = document.getElementById('btn-cancel-match');
-            cancelBtn.onclick = () => {
-                if (MATCH_ID && IS_HOST) {
-                    remove(ref(db, `matchmaking/${MATCH_ID}`));
-                }
-                MATCH_ID = null;
-                IS_HOST = false;
-                uiMatchmaking.classList.add('hidden');
-                uiMenu.style.display = 'flex';
-                // Reload to clear listeners safely
-                window.location.reload();
-            };
-
-            get(queueRef).then((snapshot) => {
-                let foundKey = null;
-                let foundData = null;
-
-                snapshot.forEach((child) => {
-                    if (foundKey) return; 
-                    const req = child.val();
-                    if (!req) return;
-
-                    // Relaxed logic: Just find any waiting 1v1 room that isn't mine
-                    if (req.mode === '1v1' && req.status === 'waiting' && req.host !== PLAYER_ID) {
-                        foundKey = child.key;
-                        foundData = req;
-                    }
-                });
-
-                if (foundKey) {
-                    joinMatch(foundKey, foundData);
-                } else {
-                    // If no room found, I become the host
-                    createMatchRequest();
-                }
-            }).catch(e => {
-                console.log("Error fetching rooms, creating own:", e);
-                createMatchRequest();
-            });
-        }
-
-        function createMatchRequest() {
-            uiStatus.innerText = "Criando sala. Aguardando oponente...";
-            const newMatchRef = push(ref(db, 'matchmaking'));
-            MATCH_ID = newMatchRef.key;
-            IS_HOST = true;
+            // UI Feedback
+            const flash = document.getElementById('spellFlash');
+            flash.textContent = name.toUpperCase() + "!";
+            flash.style.color = '#' + spell.color.toString(16);
+            flash.style.display = 'block';
+            flash.style.transform = 'translate(-50%, -50%) scale(1.5)';
+            flash.style.opacity = '1';
             
-            const matchData = {
-                host: PLAYER_ID,
-                hostName: PLAYER_NAME,
-                mode: '1v1',
-                status: 'waiting',
-                created: Date.now()
-            };
-            
-            set(newMatchRef, matchData);
-            onDisconnect(newMatchRef).remove();
+            setTimeout(() => {
+                flash.style.opacity = '0';
+                flash.style.transform = 'translate(-50%, -50%) scale(1)';
+            }, 500);
 
-            // Listen for opponent
-            onValue(newMatchRef, (snap) => {
-                const data = snap.val();
-                if (!data) return; // Room deleted
-
-                if (data.guest && data.status === 'ready') {
-                    uiStatus.innerText = "Jogador " + data.guestName + " conectou! Iniciando...";
-                    setTimeout(() => {
-                        startGameMultiplayer(data);
-                    }, 500);
-                }
-            });
-        }
-
-        function joinMatch(matchId, matchData) {
-            uiStatus.innerText = "Entrando na sala de " + matchData.hostName + "...";
-            MATCH_ID = matchId;
-            IS_HOST = false;
-            
-            const matchRef = ref(db, `matchmaking/${matchId}`);
-            
-            const updates = {};
-            updates['guest'] = PLAYER_ID;
-            updates['guestName'] = PLAYER_NAME;
-            updates['status'] = 'ready';
-            
-            update(matchRef, updates)
-            .then(() => {
-                uiStatus.innerText = "Conectado! Sincronizando...";
-                startGameMultiplayer({...matchData, guest: PLAYER_ID, guestName: PLAYER_NAME});
-            })
-            .catch(err => {
-                console.error("Join failed:", err);
-                uiStatus.innerText = "Falha ao entrar. Tentando novamente...";
-                setTimeout(findMatch, 2000);
-            });
-        }
-
-        function startGameMultiplayer(data) {
-            uiMatchmaking.classList.add('hidden');
-            uiHud.classList.remove('hidden');
-            
-            // Atualiza nomes na HUD
-            document.getElementById('p1-name').innerText = IS_HOST ? "VOCÊ (AZUL)" : data.hostName;
-            document.getElementById('p2-name').innerText = IS_HOST ? data.guestName : "VOCÊ (VERMELHO)";
-
-            startGame(GAME_MODE, true);
-
-            // IMPORTANTE: Agora usamos 'matchmaking/MATCH_ID/game' para dados de jogo
-            // para manter tudo junto e facilitar debug/permissões
-            const gamePath = `matchmaking/${MATCH_ID}/game`;
-            
-            // Se for GUEST, escuta o estado do jogo (Bola, Placar, Tempo) que o Host manda
-            if (!IS_HOST) {
-                onValue(ref(db, `${gamePath}/state`), (snap) => {
-                    const s = snap.val();
-                    if(s) {
-                        // Interpolação simples
-                        ball.x = s.ball.x;
-                        ball.z = s.ball.z;
-                        ball.y = s.ball.y || ball.radius; // Default to ground if missing
-                        ball.vx = s.ball.vx;
-                        ball.vz = s.ball.vz;
-                        ball.vy = s.ball.vy || 0;
-                        
-                        // Sincroniza placar e tempo
-                        if (gameState.scoreRed !== s.score.r || gameState.scoreBlue !== s.score.b) {
-                             gameState.scoreRed = s.score.r;
-                             gameState.scoreBlue = s.score.b;
-                             updateVisuals(); // Força update do placar
-                        }
-                        gameState.time = s.time;
-                    }
-                });
+            // Game Logic
+            if(spell.type === 'projectile') {
+                const geo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+                const mat = new THREE.MeshBasicMaterial({ color: spell.color });
+                const mesh = new THREE.Mesh(geo, mat);
+                
+                // Position at staff or camera front
+                const origin = new THREE.Vector3(0, 2, 0);
+                origin.applyMatrix4(player.yaw.matrixWorld);
+                
+                // Direction
+                const direction = new THREE.Vector3(0, 0, -1);
+                direction.applyQuaternion(player.yaw.quaternion);
+                direction.applyQuaternion(player.pitch.quaternion);
+                
+                mesh.position.copy(player.yaw.position).add(origin);
+                scene.add(mesh);
+                
+                projectiles.push({ mesh, velocity: direction.multiplyScalar(spell.speed), damage: spell.damage, life: 100 });
             }
+            else if (spell.type === 'heal') {
+                player.health = Math.min(100, player.health + spell.heal);
+                updateHUD();
+            }
+        }
 
-            // Ambos escutam movimentos dos jogadores
-            onValue(ref(db, `${gamePath}/players`), (snap) => {
-                const pData = snap.val();
-                if (pData) {
-                    Object.keys(pData).forEach(key => {
-                        // Ignora meu próprio player no server (confio no local)
-                        // A não ser que queiramos correção de servidor, mas pra arcade simples, local é rei.
-                        
-                        const pObj = players.find(p => p.id === key);
-                        if (pObj && pObj.role === 'remote') {
-                             const pState = pData[key];
-                             pObj.x = pState.x;
-                             pObj.z = pState.z;
-                             pObj.vx = pState.vx;
-                             pObj.vz = pState.vz;
-                             pObj.angle = pState.angle;
-                             
-                             // Visualiza chute do oponente? (opcional)
-                             // if(pState.kicking) ...
-                        }
-                    });
-                }
+        // ==================== ENEMIES ====================
+        let enemies = [];
+        const enemyGeo = new THREE.BoxGeometry(1, 1, 1);
+        const baseEnemyTexture = createPixelTexture('#ff0000', 0.2);
+
+        function spawnEnemy() {
+            const mesh = new THREE.Group();
+            
+            // Body - Clone material for independent flashing
+            const mat = new THREE.MeshStandardMaterial({ map: baseEnemyTexture });
+            const body = new THREE.Mesh(enemyGeo, mat);
+            body.position.y = 0.5;
+            body.castShadow = true;
+            mesh.add(body);
+            
+            // Eyes
+            const eyeGeo = new THREE.BoxGeometry(0.2, 0.2, 0.1);
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+            const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+            leftEye.position.set(-0.2, 0.7, 0.5);
+            mesh.add(leftEye);
+            const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+            rightEye.position.set(0.2, 0.7, 0.5);
+            mesh.add(rightEye);
+
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 30 + Math.random() * 20;
+            mesh.position.set(
+                Math.cos(angle) * dist,
+                0,
+                Math.sin(angle) * dist
+            );
+            
+            scene.add(mesh);
+            enemies.push({ 
+                mesh, 
+                bodyMesh: body, // Reference to body for color changing
+                health: 50, 
+                speed: 0.1 + Math.random() * 0.05,
+                isHit: false
             });
         }
 
-        // --- Main Loop ---
+        function spawnInitialEnemies() {
+            for(let i=0; i<5; i++) spawnEnemy();
+        }
+
+        // ==================== GAME LOOP ====================
+        function updateHUD() {
+            document.getElementById('healthBar').style.width = `${player.health}%`;
+            document.getElementById('healthText').innerText = `${Math.floor(player.health)}/100`;
+            document.getElementById('scoreVal').innerText = player.score;
+        }
+
         function animate() {
             requestAnimationFrame(animate);
-            updateGame(0.016); // ~60fps fixed step
+
+            if (currentState === STATE.LOBBY) {
+                // Rotate camera around wizard in lobby
+                const t = Date.now() * 0.0005;
+                camera.position.x = Math.cos(t) * 8;
+                camera.position.z = Math.sin(t) * 8;
+                camera.position.y = 3;
+                camera.lookAt(0, 1.5, 0);
+                
+                // Idle animation
+                player.mesh.children[0].position.y = 0.75 + Math.sin(t * 4) * 0.05;
+            }
+            else if (currentState === STATE.PLAYING) {
+                // Player Movement
+                const moveSpeed = player.speed;
+                const dir = new THREE.Vector3();
+                
+                if(keys.w) dir.z -= 1;
+                if(keys.s) dir.z += 1;
+                if(keys.a) dir.x -= 1;
+                if(keys.d) dir.x += 1;
+                
+                if(dir.length() > 0) {
+                    dir.normalize();
+                    // Align movement to Yaw rotation (y-axis only)
+                    dir.applyQuaternion(player.yaw.quaternion);
+                    player.yaw.position.add(dir.multiplyScalar(moveSpeed));
+                }
+
+                // Projectiles
+                for(let i = projectiles.length-1; i>=0; i--) {
+                    const p = projectiles[i];
+                    p.mesh.position.add(p.velocity);
+                    p.life--;
+                    
+                    // Collision with ground
+                    if(p.mesh.position.y < 0 || p.life <= 0) {
+                        scene.remove(p.mesh);
+                        projectiles.splice(i, 1);
+                        continue;
+                    }
+
+                    // Collision with enemies
+                    for(let j = enemies.length-1; j>=0; j--) {
+                        const e = enemies[j];
+                        if(p.mesh.position.distanceTo(e.mesh.position) < 1.5) {
+                            e.health -= p.damage;
+                            
+                            // Hit effect
+                            if (!e.isHit) {
+                                e.isHit = true;
+                                const originalColor = 0xffffff; // The texture provides color, tint is white by default
+                                e.bodyMesh.material.emissive.setHex(0xff0000); // Flash red emissive
+                                e.bodyMesh.material.emissiveIntensity = 1;
+                                
+                                setTimeout(() => {
+                                    if(e && e.bodyMesh) {
+                                        e.bodyMesh.material.emissive.setHex(0x000000);
+                                        e.bodyMesh.material.emissiveIntensity = 0;
+                                        e.isHit = false;
+                                    }
+                                }, 100);
+                            }
+                            
+                            scene.remove(p.mesh);
+                            projectiles.splice(i, 1);
+                            
+                            if(e.health <= 0) {
+                                scene.remove(e.mesh);
+                                enemies.splice(j, 1);
+                                player.score += 10;
+                                updateHUD();
+                                spawnEnemy(); // Respawn
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                // Enemies
+                enemies.forEach(e => {
+                    const dir = new THREE.Vector3().subVectors(player.yaw.position, e.mesh.position);
+                    dir.y = 0;
+                    if(dir.length() > 1) {
+                        dir.normalize();
+                        e.mesh.position.add(dir.multiplyScalar(e.speed));
+                        e.mesh.lookAt(player.yaw.position);
+                    } else {
+                        // Damage player
+                        player.health -= 0.1;
+                        updateHUD();
+                    }
+                });
+
+                if(player.health <= 0) {
+                    alert('GAME OVER! Score: ' + player.score);
+                    returnToLobby();
+                }
+            }
+
             renderer.render(scene, camera);
         }
-        
-        // --- UI Events ---
-        function setupUI() {
-            // Mode Select
-            document.querySelectorAll('.mode-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    document.querySelectorAll('.mode-btn').forEach(b => {
-                        b.classList.remove('bg-green-600', 'border-green-400');
-                        b.classList.add('bg-gray-700', 'border-transparent');
-                    });
-                    e.target.classList.remove('bg-gray-700', 'border-transparent');
-                    e.target.classList.add('bg-green-600', 'border-green-400');
-                    GAME_MODE = e.target.dataset.mode;
-                });
-            });
-            
-            document.getElementById('btn-singleplayer').addEventListener('click', () => {
-                PLAYER_NAME = document.getElementById('player-name-input').value || "Jogador 1";
-                uiMenu.style.display = 'none';
-                uiHud.classList.remove('hidden');
-                startGame(GAME_MODE, false);
-            });
-            
-            document.getElementById('btn-multiplayer').addEventListener('click', () => {
-                if (GAME_MODE !== '1v1') {
-                    alert("Apenas o modo 1v1 está disponível para Multiplayer no momento.");
-                    return;
-                }
-                PLAYER_NAME = document.getElementById('player-name-input').value || "Jogador 1";
-                findMatch();
-            });
-        }
 
-        function setupInputs() {
-            // Keyboard
-            window.addEventListener('keydown', (e) => {
-                const k = e.key.toLowerCase();
-                if (keys.hasOwnProperty(k)) keys[k] = true;
-                if (e.key === 'ArrowUp') keys.w = true;
-                if (e.key === 'ArrowDown') keys.s = true;
-                if (e.key === 'ArrowLeft') keys.a = true;
-                if (e.key === 'ArrowRight') keys.d = true;
-                if (e.key === ' ') {
-                    if (!isCharging) {
-                        isCharging = true;
-                        kickCharge = 0;
-                    }
-                }
-            });
-            window.addEventListener('keyup', (e) => {
-                const k = e.key.toLowerCase();
-                if (keys.hasOwnProperty(k)) keys[k] = false;
-                if (e.key === 'ArrowUp') keys.w = false;
-                if (e.key === 'ArrowDown') keys.s = false;
-                if (e.key === 'ArrowLeft') keys.a = false;
-                if (e.key === 'ArrowRight') keys.d = false;
-                if (e.key === ' ') {
-                    isCharging = false;
-                    keys.space = true; // Trigger kick
-                    setTimeout(() => keys.space = false, 100);
-                }
-            });
+        // Start loop
+        animate();
 
-            // Mouse
-            window.addEventListener('mousedown', (e) => {
-                if (e.button === 0) { // Left Click
-                    mouse.left = true;
-                    if (!isCharging) {
-                        isCharging = true;
-                        kickCharge = 0;
-                    }
-                }
-                if (e.button === 2) { // Right Click
-                    mouse.right = true;
-                }
-            });
+        // Handle resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
 
-            window.addEventListener('mouseup', (e) => {
-                if (e.button === 0) {
-                    mouse.left = false;
-                    isCharging = false;
-                    keys.space = true; // Trigger kick logic
-                    setTimeout(() => keys.space = false, 100);
-                }
-                if (e.button === 2) {
-                    mouse.right = false;
-                }
-            });
-
-            // Disable Context Menu
-            window.addEventListener('contextmenu', e => e.preventDefault());
-            
-            // Mobile
-            const joy = document.getElementById('joystick-area');
-            const knob = document.getElementById('joystick-knob');
-            let tId = null;
-            let origin = {x:0, y:0};
-            
-            joy.addEventListener('touchstart', e => {
-                e.preventDefault();
-                const t = e.changedTouches[0];
-                tId = t.identifier;
-                const r = joy.getBoundingClientRect();
-                origin = {x: r.left + r.width/2, y: r.top + r.height/2};
-                updateJoy(t.clientX, t.clientY);
-            });
-            joy.addEventListener('touchmove', e => {
-                e.preventDefault();
-                for(let i=0; i<e.changedTouches.length; i++){
-                    if(e.changedTouches[i].identifier === tId) updateJoy(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
-                }
-            });
-            joy.addEventListener('touchend', e => {
-                e.preventDefault();
-                tId = null;
-                knob.style.transform = `translate(0px, 0px)`;
-                joystickVector = {x:0, y:0};
-            });
-            
-            function updateJoy(cx, cy) {
-                const max = 40;
-                let dx = cx - origin.x;
-                let dy = cy - origin.y;
-                const d = Math.sqrt(dx*dx + dy*dy);
-                if(d > max) { dx = (dx/d)*max; dy = (dy/d)*max; }
-                knob.style.transform = `translate(${dx}px, ${dy}px)`;
-                joystickVector = { x: dx/max, y: dy/max };
-            }
-            
-            const btn = document.getElementById('kick-btn');
-            btn.addEventListener('touchstart', e => { 
-                e.preventDefault(); 
-                isCharging = true;
-                kickCharge = 0;
-            });
-            btn.addEventListener('touchend', e => { 
-                e.preventDefault(); 
-                isCharging = false;
-                keys.space = true;
-                setTimeout(() => keys.space = false, 100);
-            });
-        }
-
-        init();
     </script>
 </body>
 </html>
