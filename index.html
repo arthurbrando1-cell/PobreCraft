@@ -203,7 +203,7 @@
         // Team 0 = Blue (Bottom/Positive Z goal), Team 1 = Red (Top/Negative Z goal)
         // Note: Blue defends Positive Z, attacks Negative Z. Red defends Negative Z, attacks Positive Z.
         
-        let ball = { x: 0, z: 0, vx: 0, vz: 0, radius: 0.7 };
+        let ball = { x: 0, y: 0.7, z: 0, vx: 0, vy: 0, vz: 0, radius: 0.7 };
         
         // Game State
         let gameState = {
@@ -238,8 +238,7 @@
 
         function setupThreeJS() {
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x1a202c);
-            // Fog removida completamente a pedido do usuário
+            scene.background = new THREE.Color(0x87ceeb); // Sky Blue
             scene.fog = null;
 
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -364,30 +363,30 @@
             const bootMat = new THREE.MeshStandardMaterial({ color: 0x111111 }); // Black boots
 
             // Head
-            const head = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.9, 0.8), skinMat);
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16), skinMat);
             head.position.y = 3.6;
             head.castShadow = true;
             group.add(head);
 
             // Torso
-            const torso = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 0.7), shirtMat);
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.4, 0.6), shirtMat);
             torso.position.y = 2.5;
             torso.castShadow = true;
             group.add(torso);
 
             // Arms
             const createLimb = (x, y, mat, w, h) => {
-                const limb = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), mat);
+                const limb = new THREE.Mesh(new THREE.CylinderGeometry(w, w*0.8, h, 8), mat);
                 limb.position.set(x, y, 0);
                 limb.castShadow = true;
                 return limb;
             };
 
-            const leftArm = createLimb(-0.8, 2.5, skinMat, 0.35, 1.3);
-            const rightArm = createLimb(0.8, 2.5, skinMat, 0.35, 1.3);
+            const leftArm = createLimb(-0.8, 2.5, skinMat, 0.18, 1.3);
+            const rightArm = createLimb(0.8, 2.5, skinMat, 0.18, 1.3);
             // Sleeve
-            leftArm.add(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.4), shirtMat).translateY(0.4));
-            rightArm.add(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.4), shirtMat).translateY(0.4));
+            leftArm.add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.4, 8), shirtMat).translateY(0.4));
+            rightArm.add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.4, 8), shirtMat).translateY(0.4));
             
             group.add(leftArm);
             group.add(rightArm);
@@ -398,16 +397,16 @@
             group.add(hips);
             
             // Shorts part of torso/hips
-            const shorts = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 0.75), shortsMat);
+            const shorts = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.6, 0.7), shortsMat);
             shorts.position.y = 0;
             hips.add(shorts);
 
-            const leftLeg = createLimb(-0.35, -0.9, socksMat, 0.35, 1.5);
-            const rightLeg = createLimb(0.35, -0.9, socksMat, 0.35, 1.5);
+            const leftLeg = createLimb(-0.3, -0.9, socksMat, 0.2, 1.5);
+            const rightLeg = createLimb(0.3, -0.9, socksMat, 0.2, 1.5);
             
             // Shoes
-            leftLeg.add(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.6), bootMat).translateY(-0.8).translateZ(0.1));
-            rightLeg.add(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.6), bootMat).translateY(-0.8).translateZ(0.1));
+            leftLeg.add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.5), bootMat).translateY(-0.8).translateZ(0.15));
+            rightLeg.add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.5), bootMat).translateY(-0.8).translateZ(0.15));
 
             hips.add(leftLeg);
             hips.add(rightLeg);
@@ -517,7 +516,7 @@
         }
 
         function resetBall() {
-            ball.x = 0; ball.z = 0; ball.vx = 0; ball.vz = 0;
+            ball.x = 0; ball.z = 0; ball.y = 10; ball.vx = 0; ball.vz = 0; ball.vy = 0; // Drop ball from sky
         }
 
         // --- Physics & Updates ---
@@ -582,15 +581,43 @@
                 // Ball Physics
                 ball.x += ball.vx * dt * 60;
                 ball.z += ball.vz * dt * 60;
-                ball.vx *= 0.98;
-                ball.vz *= 0.98;
+                ball.y += ball.vy * dt * 60;
+                
+                // Gravity
+                if (ball.y > ball.radius) {
+                    ball.vy -= 0.04; // Gravity
+                } else {
+                    // Ground Bounce
+                    ball.y = ball.radius;
+                    if (Math.abs(ball.vy) > 0.1) {
+                        ball.vy *= -0.6; // Bounciness
+                    } else {
+                        ball.vy = 0;
+                    }
+                }
+
+                // Friction
+                if (ball.y <= ball.radius + 0.1) {
+                    ball.vx *= 0.97;
+                    ball.vz *= 0.97;
+                } else {
+                    ball.vx *= 0.99; // Air resistance
+                    ball.vz *= 0.99;
+                }
                 
                 // Goal Checks
                 if (Math.abs(ball.z) > FIELD_LENGTH/2 - ball.radius) {
                     if (Math.abs(ball.x) < GOAL_WIDTH/2) {
-                        // Goal
-                        if (ball.z > 0) scoreGoal(1); // Red Scored
-                        else scoreGoal(0); // Blue Scored
+                        // Goal (Height check < 4)
+                        if (ball.y < 4) {
+                            if (ball.z > 0) scoreGoal(1); // Red Scored
+                            else scoreGoal(0); // Blue Scored
+                        } else {
+                             // Hit crossbar or went over
+                             if (ball.z > 0) ball.z = FIELD_LENGTH/2 - ball.radius;
+                             else ball.z = -FIELD_LENGTH/2 + ball.radius;
+                             ball.vz *= -0.5;
+                        }
                     } else {
                         // Wall bounce
                          if (ball.z > 0) ball.z = FIELD_LENGTH/2 - ball.radius;
@@ -646,31 +673,41 @@
                         const nz = (ball.z - p.z) / dist;
                         
                         let power = 0.15; // Dribble default
-                        let height = 0;
+                        let lift = 0;
 
                         if (p.role === 'local') {
                             if (keys.space) {
-                                // Use the accumulated charge (max 1.2)
-                                power = 0.5 + (kickCharge * 0.02); 
-                                if (power > 1.2) power = 1.2;
+                                // Charge determines power AND height
+                                // Low charge = Ground pass (power 0.4, lift 0)
+                                // Med charge = Shot (power 0.8, lift 0.2)
+                                // High charge = Lob/Smash (power 1.2, lift 0.5)
                                 
-                                // Right click or long charge adds height?
-                                if (mouse.right || power > 1.0) {
-                                    // Lob logic not fully implemented in physics but we can simulate speed
-                                    // height = 0.5;
+                                const chargePct = kickCharge / 60; // 0.0 to 1.0
+                                
+                                power = 0.4 + (chargePct * 1.0); // 0.4 to 1.4
+                                
+                                if (chargePct > 0.3) {
+                                    lift = chargePct * 0.6; // Up to 0.6 height force
                                 }
                                 
-                                // Reset charge after kick processed (since keys.space is momentary)
-                                // keys.space is set to false after 100ms in keyup, so it handles itself
+                                // Right click forces chip shot
+                                if (mouse.right) {
+                                    lift += 0.3;
+                                    power *= 0.8;
+                                }
                             }
                         } else if (p.role === 'bot') {
                             // Random strong kicks
-                            if (Math.random() < 0.05) power = 0.9;
+                            if (Math.random() < 0.05) {
+                                power = 0.9;
+                                lift = 0.3;
+                            }
                         }
 
                         // Apply
                         ball.vx += nx * power;
                         ball.vz += nz * power;
+                        ball.vy += lift;
                         
                         // Separate to avoid sticky
                         ball.x += nx * 0.2;
@@ -714,7 +751,7 @@
             camera.lookAt(target.x * 0.2, 0, target.z * 0.1);
             
             // Objects
-            ballMesh.position.set(ball.x, ball.radius, ball.z);
+            ballMesh.position.set(ball.x, ball.y, ball.z);
             ballMesh.rotation.x += ball.vz * 0.2;
             ballMesh.rotation.z -= ball.vx * 0.2;
 
@@ -771,11 +808,32 @@
              
              gameState.isPlaying = false;
              
-             setTimeout(() => {
-                 overlay.classList.add('hidden');
-                 resetPositions();
-                 gameState.isPlaying = true;
-             }, 2500);
+             // Check Winner (First to 5)
+             if (gameState.scoreBlue >= 5 || gameState.scoreRed >= 5) {
+                 const winner = gameState.scoreBlue >= 5 ? "AZUL" : "VERMELHO";
+                 txt.innerText = "FIM DE JOGO!";
+                 name.innerText = `VENCEDOR: ${winner}`;
+                 name.className = "text-4xl font-bold mt-4 text-shadow text-white";
+                 
+                 setTimeout(() => {
+                     overlay.classList.add('hidden');
+                     // Return to menu
+                     uiHud.classList.add('hidden');
+                     uiMenu.style.display = 'flex';
+                     
+                     if (IS_MULTIPLAYER && MATCH_ID) {
+                         // Cleanup
+                         remove(ref(db, `matchmaking/${MATCH_ID}`));
+                         window.location.reload();
+                     }
+                 }, 4000);
+             } else {
+                 setTimeout(() => {
+                     overlay.classList.add('hidden');
+                     resetPositions();
+                     gameState.isPlaying = true;
+                 }, 2500);
+             }
         }
 
         // --- Multiplayer Logic ---
@@ -784,28 +842,35 @@
             uiMenu.style.display = 'none';
             uiMatchmaking.style.display = 'flex';
             uiMatchmaking.classList.remove('hidden');
-            uiStatus.innerText = "Conectando ao lobby...";
+            uiStatus.innerText = "Buscando partidas disponíveis...";
 
-            // Referência para o lobby de matchmaking
             const queueRef = ref(db, 'matchmaking');
             
+            // Cancel Button Logic (Global for this screen)
+            const cancelBtn = document.getElementById('btn-cancel-match');
+            cancelBtn.onclick = () => {
+                if (MATCH_ID && IS_HOST) {
+                    remove(ref(db, `matchmaking/${MATCH_ID}`));
+                }
+                MATCH_ID = null;
+                IS_HOST = false;
+                uiMatchmaking.classList.add('hidden');
+                uiMenu.style.display = 'flex';
+                // Reload to clear listeners safely
+                window.location.reload();
+            };
+
             get(queueRef).then((snapshot) => {
                 let foundKey = null;
                 let foundData = null;
 
-                // Procura uma sala que esteja esperando
                 snapshot.forEach((child) => {
-                    if (foundKey) return; // Se já achou, ignora o resto
-                    
+                    if (foundKey) return; 
                     const req = child.val();
                     if (!req) return;
 
-                    // Limpa salas muito velhas (mais de 2 min)
-                    const isOld = (Date.now() - (req.created || 0)) > 120000;
-                    if (isOld) return; 
-
-                    // Se a sala está esperando, é do mesmo modo, e não é minha
-                    if (req.mode === GAME_MODE && req.status === 'waiting' && req.host !== PLAYER_ID) {
+                    // Relaxed logic: Just find any waiting 1v1 room that isn't mine
+                    if (req.mode === '1v1' && req.status === 'waiting' && req.host !== PLAYER_ID) {
                         foundKey = child.key;
                         foundData = req;
                     }
@@ -814,18 +879,17 @@
                 if (foundKey) {
                     joinMatch(foundKey, foundData);
                 } else {
-                    // Nenhuma sala encontrada, criar uma
+                    // If no room found, I become the host
                     createMatchRequest();
                 }
             }).catch(e => {
-                console.error("Erro na busca, criando sala:", e);
+                console.log("Error fetching rooms, creating own:", e);
                 createMatchRequest();
             });
         }
 
         function createMatchRequest() {
             uiStatus.innerText = "Criando sala. Aguardando oponente...";
-            // Cria nova sala
             const newMatchRef = push(ref(db, 'matchmaking'));
             MATCH_ID = newMatchRef.key;
             IS_HOST = true;
@@ -833,37 +897,21 @@
             const matchData = {
                 host: PLAYER_ID,
                 hostName: PLAYER_NAME,
-                mode: GAME_MODE,
+                mode: '1v1',
                 status: 'waiting',
                 created: Date.now()
             };
             
-            // Define os dados e remove se desconectar
             set(newMatchRef, matchData);
             onDisconnect(newMatchRef).remove();
 
-            // Cancel button logic
-            const cancelBtn = document.getElementById('btn-cancel-match');
-            cancelBtn.onclick = () => {
-                remove(newMatchRef);
-                uiMatchmaking.classList.add('hidden');
-                uiMenu.style.display = 'flex';
-                // Stop listening
-                off(newMatchRef);
-            };
-
-            // Escuta mudanças NESTA sala específica
+            // Listen for opponent
             onValue(newMatchRef, (snap) => {
                 const data = snap.val();
-                if (!data) return; // Sala deletada
+                if (!data) return; // Room deleted
 
-                // Se alguém entrou (status mudou para ready ou tem guest)
                 if (data.guest && data.status === 'ready') {
-                    uiStatus.innerText = "Oponente encontrado! Iniciando...";
-                    // Remove o listener para não disparar dnv
-                    // off(newMatchRef); 
-                    
-                    // Pequeno delay para garantir sincronia
+                    uiStatus.innerText = "Jogador " + data.guestName + " conectou! Iniciando...";
                     setTimeout(() => {
                         startGameMultiplayer(data);
                     }, 500);
@@ -872,15 +920,11 @@
         }
 
         function joinMatch(matchId, matchData) {
-            uiStatus.innerText = "Sala encontrada! Entrando...";
+            uiStatus.innerText = "Entrando na sala de " + matchData.hostName + "...";
             MATCH_ID = matchId;
             IS_HOST = false;
             
             const matchRef = ref(db, `matchmaking/${matchId}`);
-            
-            // Tenta 'reservar' a sala mudando o status para ready
-            // Usando transaction para evitar condição de corrida (dois entrando na mesma)
-            // Mas para simplificar, usaremos update direto, assumindo baixo tráfego
             
             const updates = {};
             updates['guest'] = PLAYER_ID;
@@ -889,14 +933,13 @@
             
             update(matchRef, updates)
             .then(() => {
-                uiStatus.innerText = "Conectado! Aguardando Host...";
-                // Sucesso ao entrar
+                uiStatus.innerText = "Conectado! Sincronizando...";
                 startGameMultiplayer({...matchData, guest: PLAYER_ID, guestName: PLAYER_NAME});
             })
             .catch(err => {
-                console.error("Erro ao entrar na sala:", err);
-                uiStatus.innerText = "Sala ocupada ou erro. Tentando outra...";
-                setTimeout(findMatch, 1000);
+                console.error("Join failed:", err);
+                uiStatus.innerText = "Falha ao entrar. Tentando novamente...";
+                setTimeout(findMatch, 2000);
             });
         }
 
@@ -922,8 +965,10 @@
                         // Interpolação simples
                         ball.x = s.ball.x;
                         ball.z = s.ball.z;
+                        ball.y = s.ball.y || ball.radius; // Default to ground if missing
                         ball.vx = s.ball.vx;
                         ball.vz = s.ball.vz;
+                        ball.vy = s.ball.vy || 0;
                         
                         // Sincroniza placar e tempo
                         if (gameState.scoreRed !== s.score.r || gameState.scoreBlue !== s.score.b) {
