@@ -37,6 +37,7 @@
         <div id="main-menu" class="absolute inset-0 flex flex-col items-center justify-center bg-black/90 text-white z-50 transition-all duration-500 bg-[url('https://images.unsplash.com/photo-1579952363873-27f3bade9f55?q=80&w=1935&auto=format&fit=crop')] bg-cover bg-center bg-blend-multiply">
             <h1 class="text-5xl md:text-8xl font-black text-green-500 mb-2 tracking-tighter text-shadow italic transform -skew-x-6">SUPER 3D<br><span class="text-white">FUTEBOL</span></h1>
             <p class="text-gray-300 mb-8 text-xl font-light tracking-widest">MULTIPLAYER EDITION</p>
+            <p class="text-yellow-400 mb-4 font-bold animate-pulse">NOVO: Controles de Mouse! Segure para chutar forte.</p>
             
             <div class="glass-panel p-8 rounded-2xl shadow-2xl w-full max-w-md flex flex-col gap-4">
                 <div class="space-y-2">
@@ -201,6 +202,9 @@
 
         // Inputs
         const keys = { w: false, a: false, s: false, d: false, space: false };
+        let mouse = { left: false, right: false };
+        let kickCharge = 0;
+        let isCharging = false;
         let joystickVector = { x: 0, y: 0 };
 
         // DOM
@@ -221,11 +225,12 @@
         function setupThreeJS() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x1a202c);
-            scene.fog = new THREE.Fog(0x1a202c, 40, 90);
+            // Fog removida para ver o campo todo
+            // scene.fog = new THREE.Fog(0x1a202c, 40, 90);
 
-            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 45, 55); 
-            camera.lookAt(0, 0, 5);
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 55, 45); // Camera mais alta e inclinada
+            camera.lookAt(0, 0, 0);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -511,6 +516,11 @@
                 gameState.time += dt;
             }
 
+            // Charging Logic
+            if (isCharging) {
+                kickCharge = Math.min(kickCharge + 1, 60); // Charge up to 60 frames
+            }
+
             // Controls for Local Player
             const localP = players.find(p => p.role === 'local');
             if (localP) {
@@ -616,19 +626,38 @@
                     // Collision with Ball
                     const dist = Math.hypot(ball.x - p.x, ball.z - p.z);
                     if (dist < 1.5) {
-                        // Kick
+                        // Calculate Kick Vector
                         const nx = (ball.x - p.x) / dist;
                         const nz = (ball.z - p.z) / dist;
                         
-                        const kickPower = (p.role === 'local' && keys.space) ? 0.8 : 0.15; // Hard kick or dribble
-                        // AI Kick
-                        const aiKick = (p.role === 'bot' && Math.random() < 0.05);
-                        const power = (p.role==='local' && keys.space) || aiKick ? 0.8 : 0.15;
+                        let power = 0.15; // Dribble default
+                        let height = 0;
 
+                        if (p.role === 'local') {
+                            if (keys.space) {
+                                // Use the accumulated charge (max 1.2)
+                                power = 0.5 + (kickCharge * 0.02); 
+                                if (power > 1.2) power = 1.2;
+                                
+                                // Right click or long charge adds height?
+                                if (mouse.right || power > 1.0) {
+                                    // Lob logic not fully implemented in physics but we can simulate speed
+                                    // height = 0.5;
+                                }
+                                
+                                // Reset charge after kick processed (since keys.space is momentary)
+                                // keys.space is set to false after 100ms in keyup, so it handles itself
+                            }
+                        } else if (p.role === 'bot') {
+                            // Random strong kicks
+                            if (Math.random() < 0.05) power = 0.9;
+                        }
+
+                        // Apply
                         ball.vx += nx * power;
                         ball.vz += nz * power;
                         
-                        // Separate
+                        // Separate to avoid sticky
                         ball.x += nx * 0.2;
                         ball.z += nz * 0.2;
                     }
@@ -700,6 +729,16 @@
             document.getElementById('timer').innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
             document.getElementById('score-home').innerText = gameState.scoreBlue;
             document.getElementById('score-away').innerText = gameState.scoreRed;
+            
+            // Update Power Bar
+            const bar = document.getElementById('power-bar-container');
+            if (isCharging) {
+                bar.classList.remove('hidden');
+                const pct = (kickCharge / 60) * 100;
+                document.getElementById('power-fill').style.width = `${pct}%`;
+            } else {
+                bar.classList.add('hidden');
+            }
         }
         
         function scoreGoal(teamId) {
@@ -730,26 +769,39 @@
             uiMenu.style.display = 'none';
             uiMatchmaking.style.display = 'flex';
             uiMatchmaking.classList.remove('hidden');
-            uiStatus.innerText = "Entrando na fila...";
+            uiStatus.innerText = "Buscando oponentes...";
 
+            // Limpeza de partidas antigas (opcional, mas ajuda a não tentar conectar em salas mortas)
             const queueRef = ref(db, 'matchmaking');
             
-            // Check for open matches
             get(queueRef).then((snapshot) => {
-                let found = false;
+                let foundKey = null;
+                let foundData = null;
+
                 snapshot.forEach((child) => {
-                    if (found) return;
+                    if (foundKey) return;
+                    
                     const req = child.val();
-                    if (req.mode === GAME_MODE && req.status === 'waiting' && req.id !== PLAYER_ID) {
-                        // Found a match!
-                        found = true;
-                        joinMatch(child.key, req);
+                    const isOld = (Date.now() - (req.created || 0)) > 60000; // 1 min timeout
+                    
+                    // Remove old rooms
+                    if (isOld && req.status === 'waiting') {
+                        // try remove? (unsafe without auth rules but ok for demo)
+                        // remove(child.ref); 
+                    } else if (req.mode === GAME_MODE && req.status === 'waiting' && req.host !== PLAYER_ID) {
+                        foundKey = child.key;
+                        foundData = req;
                     }
                 });
-                
-                if (!found) {
+
+                if (foundKey) {
+                    joinMatch(foundKey, foundData);
+                } else {
                     createMatchRequest();
                 }
+            }).catch(e => {
+                console.error("Erro na busca:", e);
+                createMatchRequest();
             });
         }
 
@@ -773,9 +825,12 @@
             // Listen for join
             onValue(newMatchRef, (snap) => {
                 const data = snap.val();
-                if (data && data.guest) {
-                    // Start Game!
-                    startGameMultiplayer(data);
+                if (data && data.guest && data.status === 'ready') {
+                    // Clean up matchmaking entry after a delay to allow guest to read it? 
+                    // Actually better to keep it briefly or move to 'games' node completely.
+                    // For simplicity, we just start.
+                    uiStatus.innerText = "Oponente conectado! Iniciando...";
+                    setTimeout(() => startGameMultiplayer(data), 500);
                 }
             });
             
@@ -788,7 +843,7 @@
         }
 
         function joinMatch(matchId, matchData) {
-            uiStatus.innerText = "Partida encontrada! Entrando...";
+            uiStatus.innerText = "Partida encontrada! Conectando...";
             MATCH_ID = matchId;
             IS_HOST = false;
             
@@ -797,9 +852,15 @@
             updates[`matchmaking/${matchId}/guestName`] = PLAYER_NAME;
             updates[`matchmaking/${matchId}/status`] = 'ready';
             
-            update(ref(db), updates).then(() => {
-                // Init game listeners
+            update(ref(db), updates)
+            .then(() => {
+                uiStatus.innerText = "Sincronizando...";
                 startGameMultiplayer({...matchData, guest: PLAYER_ID, guestName: PLAYER_NAME});
+            })
+            .catch(err => {
+                console.error("Erro ao entrar:", err);
+                uiStatus.innerText = "Falha ao conectar. Tentando outro...";
+                setTimeout(findMatch, 2000);
             });
         }
 
@@ -897,22 +958,63 @@
         }
 
         function setupInputs() {
+            // Keyboard
             window.addEventListener('keydown', (e) => {
                 const k = e.key.toLowerCase();
-                if (keys.hasOwnProperty(k) || k === ' ') keys[k === ' ' ? 'space' : k] = true;
+                if (keys.hasOwnProperty(k)) keys[k] = true;
                 if (e.key === 'ArrowUp') keys.w = true;
                 if (e.key === 'ArrowDown') keys.s = true;
                 if (e.key === 'ArrowLeft') keys.a = true;
                 if (e.key === 'ArrowRight') keys.d = true;
+                if (e.key === ' ') {
+                    if (!isCharging) {
+                        isCharging = true;
+                        kickCharge = 0;
+                    }
+                }
             });
             window.addEventListener('keyup', (e) => {
                 const k = e.key.toLowerCase();
-                if (keys.hasOwnProperty(k) || k === ' ') keys[k === ' ' ? 'space' : k] = false;
+                if (keys.hasOwnProperty(k)) keys[k] = false;
                 if (e.key === 'ArrowUp') keys.w = false;
                 if (e.key === 'ArrowDown') keys.s = false;
                 if (e.key === 'ArrowLeft') keys.a = false;
                 if (e.key === 'ArrowRight') keys.d = false;
+                if (e.key === ' ') {
+                    isCharging = false;
+                    keys.space = true; // Trigger kick
+                    setTimeout(() => keys.space = false, 100);
+                }
             });
+
+            // Mouse
+            window.addEventListener('mousedown', (e) => {
+                if (e.button === 0) { // Left Click
+                    mouse.left = true;
+                    if (!isCharging) {
+                        isCharging = true;
+                        kickCharge = 0;
+                    }
+                }
+                if (e.button === 2) { // Right Click
+                    mouse.right = true;
+                }
+            });
+
+            window.addEventListener('mouseup', (e) => {
+                if (e.button === 0) {
+                    mouse.left = false;
+                    isCharging = false;
+                    keys.space = true; // Trigger kick logic
+                    setTimeout(() => keys.space = false, 100);
+                }
+                if (e.button === 2) {
+                    mouse.right = false;
+                }
+            });
+
+            // Disable Context Menu
+            window.addEventListener('contextmenu', e => e.preventDefault());
             
             // Mobile
             const joy = document.getElementById('joystick-area');
@@ -952,8 +1054,17 @@
             }
             
             const btn = document.getElementById('kick-btn');
-            btn.addEventListener('touchstart', e => { e.preventDefault(); keys.space = true; });
-            btn.addEventListener('touchend', e => { e.preventDefault(); keys.space = false; });
+            btn.addEventListener('touchstart', e => { 
+                e.preventDefault(); 
+                isCharging = true;
+                kickCharge = 0;
+            });
+            btn.addEventListener('touchend', e => { 
+                e.preventDefault(); 
+                isCharging = false;
+                keys.space = true;
+                setTimeout(() => keys.space = false, 100);
+            });
         }
 
         init();
