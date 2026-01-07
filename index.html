@@ -27,95 +27,190 @@
             height: 100%;
             object-fit: cover;
         }
-        #localVideo {
+        /* Hidden source video for WebGL processing */
+        #sourceVideo {
+            display: none;
+        }
+        
+        #remoteVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #localCanvas {
             position: absolute;
             bottom: 10px;
             right: 10px;
-            width: 120px;
-            height: 90px;
+            width: 160px; /* Slightly larger for canvas clarity */
+            height: 120px;
             border: 2px solid white;
             border-radius: 4px;
             z-index: 10;
             transform: scaleX(-1); /* Mirror effect */
+            background: #222;
         }
-        /* Filters */
-        .filter-grayscale { filter: grayscale(100%); }
-        .filter-sepia { filter: sepia(100%); }
-        .filter-invert { filter: invert(100%); }
-        .filter-contrast { filter: contrast(160%); }
-        .filter-hue { filter: hue-rotate(90deg); }
-        .filter-blur { filter: blur(3px); }
 
         /* Chat styles */
         .chat-message {
             margin-bottom: 8px;
             padding: 8px;
             border-radius: 4px;
+            word-wrap: break-word;
         }
-        .stranger-msg { color: blue; }
-        .you-msg { color: gray; }
+        .stranger-msg { color: #2563eb; }
+        .you-msg { color: #4b5563; }
         .system-msg { color: #555; font-style: italic; font-size: 0.9em; }
+
+        /* Modal */
+        #loginModal {
+            background-color: rgba(0,0,0,0.8);
+        }
+        
+        /* Profile Image in Chat */
+        .profile-thumb {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid white;
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col">
 
+    <!-- Login Modal -->
+    <div id="loginModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl p-6 w-full max-w-md">
+            <h2 class="text-2xl font-bold mb-4 text-center">Configurar Perfil</h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Nome de Usuário (Único)</label>
+                    <input type="text" id="usernameInput" class="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ex: BatataKiller">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Bio / Status</label>
+                    <input type="text" id="bioInput" class="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ex: Procuro amizades...">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Foto de Perfil</label>
+                    <div class="flex items-center gap-4 mt-2">
+                        <div class="w-16 h-16 rounded-full bg-gray-200 overflow-hidden border border-gray-300">
+                            <img id="profilePreview" src="https://via.placeholder.com/150" class="w-full h-full object-cover">
+                        </div>
+                        <input type="file" id="fileInput" accept="image/*" class="text-sm">
+                    </div>
+                </div>
+
+                <button id="loginBtn" class="w-full bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700 transition">
+                    Entrar no Chat
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Header -->
     <header class="bg-white p-4 shadow-md flex justify-between items-center">
-        <h1 class="text-2xl font-bold text-gray-800"><span class="text-blue-500">Omegle</span> Clone</h1>
-        <div class="text-sm text-gray-500" id="statusText">Desconectado</div>
+        <div class="flex items-center gap-2">
+            <h1 class="text-2xl font-bold text-gray-800"><span class="text-blue-500">Omegle</span> Clone</h1>
+        </div>
+        
+        <!-- User Info Header -->
+        <div class="flex items-center gap-3" id="headerUserInfo">
+            <!-- Populated by JS -->
+        </div>
+
+        <div class="text-sm font-bold px-3 py-1 rounded bg-gray-100" id="statusText">Desconectado</div>
     </header>
 
     <!-- Main Content -->
-    <main class="flex-1 flex flex-col md:flex-row p-4 gap-4 overflow-hidden">
+    <main class="flex-1 flex flex-col md:flex-row p-4 gap-4 overflow-hidden relative">
         
         <!-- Video Section -->
         <div class="flex-1 flex flex-col gap-4">
-            <div class="video-container flex-1 relative shadow-lg">
+            <div class="video-container flex-1 relative shadow-lg bg-gray-900">
                 <video id="remoteVideo" autoplay playsinline></video>
-                <video id="localVideo" autoplay playsinline muted></video>
                 
-                <div class="absolute top-4 left-4 bg-black/50 text-white px-2 py-1 rounded text-sm z-20">
-                    Estranho
+                <!-- Source video (hidden, used for processing) -->
+                <video id="sourceVideo" autoplay playsinline muted></video>
+                
+                <!-- Processed Output (Local) -->
+                <canvas id="localCanvas"></canvas>
+                
+                <!-- Overlays -->
+                <div class="absolute top-4 left-4 z-20 flex items-center gap-2 bg-black/60 text-white px-3 py-1.5 rounded-full" id="remoteTag">
+                    <span class="font-bold">Estranho</span>
                 </div>
-                <div class="absolute bottom-4 right-36 bg-black/50 text-white px-2 py-1 rounded text-sm z-20">
-                    Você
+
+                <div class="absolute bottom-4 right-48 z-20 flex items-center gap-2 bg-black/60 text-white px-3 py-1.5 rounded-full">
+                    <span class="font-bold">Você</span>
                 </div>
             </div>
 
             <!-- Controls -->
             <div class="bg-white p-4 rounded-lg shadow-md flex flex-wrap gap-4 items-center justify-between">
-                <div class="flex gap-2 items-center">
-                    <label class="font-semibold text-gray-700">Filtro Câmera:</label>
-                    <select id="filterSelect" class="border rounded p-2 bg-gray-50">
-                        <option value="">Normal</option>
-                        <option value="filter-grayscale">Preto & Branco</option>
-                        <option value="filter-sepia">Sépia</option>
-                        <option value="filter-invert">Invertido</option>
-                        <option value="filter-contrast">Alto Contraste</option>
-                        <option value="filter-hue">Psicodélico</option>
-                        <option value="filter-blur">Desfocado</option>
-                    </select>
+                <div class="flex flex-wrap gap-4 items-center">
+                    <div class="flex flex-col">
+                        <label class="text-xs font-semibold text-gray-500 uppercase">Distorção (WebGL)</label>
+                        <select id="distortionSelect" class="border rounded p-2 bg-gray-50 text-sm">
+                            <option value="none">Normal</option>
+                            <option value="bulge">Olho/Rosto Gigante (Bulge)</option>
+                            <option value="pinch">Rosto Pequeno (Pinch)</option>
+                            <option value="swirl">Redemoinho (Swirl)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex flex-col">
+                        <label class="text-xs font-semibold text-gray-500 uppercase">Cor (CSS)</label>
+                        <select id="colorFilterSelect" class="border rounded p-2 bg-gray-50 text-sm">
+                            <option value="">Normal</option>
+                            <option value="grayscale(100%)">Preto & Branco</option>
+                            <option value="sepia(100%)">Sépia</option>
+                            <option value="invert(100%)">Invertido</option>
+                            <option value="hue-rotate(90deg)">Alien</option>
+                        </select>
+                    </div>
+
+                    <div class="text-xs text-gray-500 italic max-w-xs">
+                        * Clique no seu vídeo para mover o centro da distorção!
+                    </div>
                 </div>
 
                 <div class="flex gap-2">
-                    <button id="startBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded transition">
-                        Iniciar
+                    <button id="startBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-8 rounded transition shadow-lg transform hover:scale-105">
+                        INICIAR
                     </button>
-                    <button id="stopBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded transition hidden">
-                        Parar / Pular
+                    <button id="stopBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-8 rounded transition hidden shadow-lg">
+                        PARAR (ESC)
                     </button>
                 </div>
             </div>
         </div>
 
         <!-- Chat Section -->
-        <div class="w-full md:w-1/3 bg-white rounded-lg shadow-md flex flex-col h-1/2 md:h-full">
-            <div id="chatArea" class="flex-1 p-4 overflow-y-auto border-b border-gray-200 bg-gray-50">
-                <div class="system-msg">Bem-vindo ao Omegle Clone! Clique em "Iniciar" para encontrar alguém.</div>
+        <div class="w-full md:w-1/3 bg-white rounded-lg shadow-md flex flex-col h-1/2 md:h-full relative">
+            
+            <!-- Stranger Profile Header -->
+            <div id="strangerProfile" class="hidden p-3 border-b bg-blue-50 flex items-center gap-3">
+                <img id="strangerPic" src="" class="w-10 h-10 rounded-full object-cover border border-blue-200">
+                <div>
+                    <div id="strangerName" class="font-bold text-gray-800">Estranho</div>
+                    <div id="strangerBio" class="text-xs text-gray-600 italic">...</div>
+                </div>
             </div>
-            <div class="p-4 flex gap-2">
+
+            <div id="chatArea" class="flex-1 p-4 overflow-y-auto border-b border-gray-200 bg-gray-50">
+                <div class="system-msg text-center mt-4">
+                    Bem-vindo! Configure seu perfil e clique em <b>INICIAR</b>.
+                </div>
+            </div>
+            
+            <div class="p-4 flex gap-2 bg-white rounded-b-lg">
                 <input id="chatInput" type="text" placeholder="Digite uma mensagem..." class="flex-1 border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-400" disabled>
-                <button id="sendBtn" class="bg-gray-200 text-gray-600 px-4 py-2 rounded hover:bg-gray-300 transition" disabled>
+                <button id="sendBtn" class="bg-gray-200 text-gray-600 px-4 py-2 rounded hover:bg-blue-500 hover:text-white transition" disabled>
                     <i class="fas fa-paper-plane"></i>
                 </button>
             </div>
@@ -123,12 +218,12 @@
 
     </main>
 
-    <!-- Firebase and Logic -->
+    <!-- Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where, getDocs, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where, getDocs, limit, serverTimestamp, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // Configuration
+        // --- Firebase Configuration ---
         const firebaseConfig = {
             apiKey: "AIzaSyDsDeOjhkkKtXK8kBpuVORQ1FTI_EdBTdU",
             authDomain: "pobrecraft-c517c.firebaseapp.com",
@@ -138,243 +233,452 @@
             appId: "1:906438912132:web:a3d9827600d3c0a52dbad1"
         };
 
-        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // WebRTC Config
+        // --- WebRTC Config ---
         const servers = {
             iceServers: [
                 { urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }
             ]
         };
 
-        // DOM Elements
-        const localVideo = document.getElementById('localVideo');
+        // --- DOM Elements ---
+        const sourceVideo = document.getElementById('sourceVideo');
+        const localCanvas = document.getElementById('localCanvas');
         const remoteVideo = document.getElementById('remoteVideo');
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
-        const filterSelect = document.getElementById('filterSelect');
-        const statusText = document.getElementById('statusText');
         const chatArea = document.getElementById('chatArea');
         const chatInput = document.getElementById('chatInput');
         const sendBtn = document.getElementById('sendBtn');
+        const statusText = document.getElementById('statusText');
+        const distortionSelect = document.getElementById('distortionSelect');
+        const colorFilterSelect = document.getElementById('colorFilterSelect');
+        
+        // Login Elements
+        const loginModal = document.getElementById('loginModal');
+        const usernameInput = document.getElementById('usernameInput');
+        const bioInput = document.getElementById('bioInput');
+        const fileInput = document.getElementById('fileInput');
+        const profilePreview = document.getElementById('profilePreview');
+        const loginBtn = document.getElementById('loginBtn');
+        const headerUserInfo = document.getElementById('headerUserInfo');
+        
+        // Stranger Info Elements
+        const strangerProfile = document.getElementById('strangerProfile');
+        const strangerName = document.getElementById('strangerName');
+        const strangerBio = document.getElementById('strangerBio');
+        const strangerPic = document.getElementById('strangerPic');
 
-        // State Variables
-        let localStream = null;
-        let remoteStream = null;
+        // --- State Variables ---
+        let localStream = null;     // Raw Camera Stream
+        let canvasStream = null;    // Processed Stream sent to peer
         let peerConnection = null;
+        let dataChannel = null;
         let roomId = null;
         let role = null; // 'caller' or 'callee'
-        let unsubscribeRoom = null; // Listener for room changes
-        let unsubscribeCandidates = null; // Listener for ice candidates
+        let unsubscribeRoom = null;
+        let unsubscribeCandidates = null;
+        
+        // User Profile State
+        let currentUser = {
+            username: `User${Math.floor(Math.random()*1000)}`,
+            bio: "Sem bio",
+            pic: "https://via.placeholder.com/150"
+        };
 
-        // --- Filter Logic ---
-        filterSelect.addEventListener('change', (e) => {
-            localVideo.className = e.target.value;
-            // Note: Sending filtered video over WebRTC is complex (requires canvas processing).
-            // For this clone, we apply the filter visually on the local element. 
-            // To send it, we'd need to captureStream from a canvas. 
-            // Let's keep it simple: visual only for now, or users can only see their own filter.
+        // WebGL State
+        let gl = null;
+        let shaderProgram = null;
+        let texture = null;
+        let animationFrameId = null;
+        let mouseX = 0.5; // Normalized 0-1
+        let mouseY = 0.5; // Normalized 0-1
+
+        // --- 1. Login & Profile Logic ---
+
+        // File Reader
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    // Simple resize to avoid huge base64 strings
+                    const img = new Image();
+                    img.src = reader.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX_SIZE = 150;
+                        let width = img.width;
+                        let height = img.height;
+                        if (width > height) {
+                            if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
+                        } else {
+                            if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+                        }
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        currentUser.pic = canvas.toDataURL('image/jpeg', 0.8);
+                        profilePreview.src = currentUser.pic;
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
         });
 
-        // --- Chat Logic ---
-        function appendMessage(text, type) {
-            const div = document.createElement('div');
-            div.className = 'chat-message';
-            if (type === 'you') {
-                div.innerHTML = `<span class="you-msg font-bold">Você:</span> ${text}`;
-            } else if (type === 'stranger') {
-                div.innerHTML = `<span class="stranger-msg font-bold">Estranho:</span> ${text}`;
-            } else {
-                div.innerHTML = `<span class="system-msg">${text}</span>`;
-            }
-            chatArea.appendChild(div);
-            chatArea.scrollTop = chatArea.scrollHeight;
-        }
-
-        async function sendMessage() {
-            const text = chatInput.value.trim();
-            if (!text || !roomId) return;
+        loginBtn.addEventListener('click', () => {
+            if (usernameInput.value.trim()) currentUser.username = usernameInput.value.trim();
+            if (bioInput.value.trim()) currentUser.bio = bioInput.value.trim();
             
-            chatInput.value = '';
-            appendMessage(text, 'you');
-
-            // Save message to subcollection 'messages' in the room document
-            // Assuming we have read/write access. If not, we rely on data channel (WebRTC)
-            // But let's try Data Channel for chat as it's cleaner for P2P text without DB latency.
-            if (dataChannel && dataChannel.readyState === 'open') {
-                dataChannel.send(text);
-            } else {
-                console.warn("Data channel not open");
-            }
-        }
-
-        chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
+            // Update UI
+            headerUserInfo.innerHTML = `
+                <img src="${currentUser.pic}" class="w-8 h-8 rounded-full border border-gray-300">
+                <div class="flex flex-col leading-tight">
+                    <span class="font-bold text-sm text-gray-800">${currentUser.username}</span>
+                    <span class="text-xs text-gray-500 truncate max-w-[100px]">${currentUser.bio}</span>
+                </div>
+            `;
+            
+            loginModal.classList.add('hidden');
+            // Try to initialize camera early for preview
+            initCamera();
         });
-        sendBtn.addEventListener('click', sendMessage);
 
-        let dataChannel = null;
 
-        // --- Media Setup ---
-        async function openUserMedia() {
+        // --- 2. WebGL & Video Processing ---
+
+        async function initCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 localStream = stream;
-                localVideo.srcObject = stream;
+                sourceVideo.srcObject = stream;
+                
+                // Wait for video to play to init Canvas dimensions
+                sourceVideo.onloadedmetadata = () => {
+                    localCanvas.width = 640; // Fixed internal resolution for performance
+                    localCanvas.height = 480;
+                    initWebGL();
+                    renderLoop();
+                };
+
+                // Create a stream from the canvas for WebRTC
+                // 30 FPS
+                const cStream = localCanvas.captureStream(30);
+                
+                // Add Audio Track from original stream to Canvas Stream
+                if (stream.getAudioTracks().length > 0) {
+                    cStream.addTrack(stream.getAudioTracks()[0]);
+                }
+                
+                canvasStream = cStream;
                 return true;
-            } catch (error) {
-                console.error('Error accessing media devices.', error);
-                alert('Erro ao acessar câmera/microfone. Verifique as permissões.');
+
+            } catch (err) {
+                console.error("Camera Error:", err);
+                alert("Erro ao acessar câmera. Verifique permissões.");
                 return false;
             }
         }
 
-        // --- Signaling / Matching Logic ---
+        // WebGL Shaders
+        const vsSource = `
+            attribute vec2 a_position;
+            attribute vec2 a_texCoord;
+            varying vec2 v_texCoord;
+            void main() {
+                gl_Position = vec4(a_position, 0, 1);
+                v_texCoord = a_texCoord;
+            }
+        `;
+
+        const fsSource = `
+            precision mediump float;
+            uniform sampler2D u_image;
+            uniform vec2 u_mouse;
+            uniform float u_mode; // 0: None, 1: Bulge, 2: Pinch, 3: Swirl
+            varying vec2 v_texCoord;
+
+            void main() {
+                vec2 uv = v_texCoord;
+                vec2 center = u_mouse; 
+                // Invert Mouse Y because WebGL Y is bottom-up, but texture coords usually top-down depending on binding.
+                // Let's assume standard 0-1.
+                
+                float dist = distance(uv, center);
+                vec2 coord = uv;
+
+                if (u_mode == 1.0) { // Bulge (Giant)
+                    float radius = 0.4;
+                    float strength = 0.6;
+                    if (dist < radius) {
+                        float percent = dist / radius;
+                        if (percent < 1.0) {
+                            float t = sin(percent * 3.14159 / 2.0); // Easing
+                            coord = center + (uv - center) * t;
+                        }
+                    }
+                } else if (u_mode == 2.0) { // Pinch
+                    float radius = 0.4;
+                    float strength = -0.5;
+                     if (dist < radius) {
+                        float percent = dist / radius;
+                        coord = center + (uv - center) * (1.0 + strength * (1.0 - percent));
+                    }
+                } else if (u_mode == 3.0) { // Swirl
+                    float radius = 0.4;
+                    float angle = 5.0; // Twist amount
+                    if (dist < radius) {
+                        float percent = (radius - dist) / radius;
+                        float theta = percent * percent * angle;
+                        float s = sin(theta);
+                        float c = cos(theta);
+                        vec2 dir = uv - center;
+                        coord = center + vec2(dot(dir, vec2(c, -s)), dot(dir, vec2(s, c)));
+                    }
+                }
+
+                gl_FragColor = texture2D(u_image, coord);
+            }
+        `;
+
+        function initWebGL() {
+            gl = localCanvas.getContext('webgl');
+            if (!gl) return;
+
+            // Compile Shaders
+            const vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
+            const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+            shaderProgram = createProgram(gl, vs, fs);
+
+            // Look up locations
+            const positionLoc = gl.getAttribLocation(shaderProgram, "a_position");
+            const texCoordLoc = gl.getAttribLocation(shaderProgram, "a_texCoord");
+            
+            // Buffers
+            const positionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+                -1, -1,  1, -1, -1,  1,
+                -1,  1,  1, -1,  1,  1,
+            ]), gl.STATIC_DRAW);
+
+            const texCoordBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+                0, 1,  1, 1,  0, 0,
+                0, 0,  1, 1,  1, 0,
+            ]), gl.STATIC_DRAW);
+
+            // Attributes
+            gl.useProgram(shaderProgram);
+            gl.enableVertexAttribArray(positionLoc);
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
+
+            gl.enableVertexAttribArray(texCoordLoc);
+            gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+            gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 0, 0);
+
+            // Texture
+            texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        }
+
+        function createShader(gl, type, source) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error(gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        }
+
+        function createProgram(gl, vs, fs) {
+            const program = gl.createProgram();
+            gl.attachShader(program, vs);
+            gl.attachShader(program, fs);
+            gl.linkProgram(program);
+            return program;
+        }
+
+        function renderLoop() {
+            if (!gl || !sourceVideo) return;
+            
+            // Update Texture
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceVideo);
+
+            // Uniforms
+            const uMouse = gl.getUniformLocation(shaderProgram, "u_mouse");
+            const uMode = gl.getUniformLocation(shaderProgram, "u_mode");
+
+            // Set Mode
+            let modeVal = 0.0;
+            if (distortionSelect.value === 'bulge') modeVal = 1.0;
+            else if (distortionSelect.value === 'pinch') modeVal = 2.0;
+            else if (distortionSelect.value === 'swirl') modeVal = 3.0;
+
+            gl.uniform1f(uMode, modeVal);
+            gl.uniform2f(uMouse, mouseX, mouseY); // Mouse control
+
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            
+            animationFrameId = requestAnimationFrame(renderLoop);
+        }
+
+        // Handle Mouse Interaction for Filters
+        localCanvas.addEventListener('mousemove', (e) => {
+            const rect = localCanvas.getBoundingClientRect();
+            // Mirror X because the canvas is mirrored visually via CSS, but internally coordinate system is standard.
+            // Actually, if CSS mirrors it, visual left is internal right.
+            let x = (e.clientX - rect.left) / rect.width;
+            let y = (e.clientY - rect.top) / rect.height;
+            
+            // Since CSS transform: scaleX(-1) flips it visually, 
+            // if I move mouse to the "right" visually, it's the "left" of the element if not transformed.
+            // But pointer events fire based on element layout.
+            // Let's just pass X and see. If it feels inverted, we do 1-x.
+            // With scaleX(-1), visual right is actually x=0 in coordinate space? No. 
+            // Let's assume standard behavior first.
+            mouseX = 1.0 - x; // Invert X because of the mirror effect on the user view
+            mouseY = 1.0 - y; // WebGL V coordinate (0 at bottom, 1 at top? Texture coords are 0 top usually)
+            // Correction: Texture coords 0,0 is usually top-left for Image/Video.
+        });
+        
+        // Touch support
+        localCanvas.addEventListener('touchmove', (e) => {
+             const rect = localCanvas.getBoundingClientRect();
+             let x = (e.touches[0].clientX - rect.left) / rect.width;
+             let y = (e.touches[0].clientY - rect.top) / rect.height;
+             mouseX = 1.0 - x;
+             mouseY = 1.0 - y;
+             e.preventDefault();
+        });
+
+        // CSS Color Filters
+        colorFilterSelect.addEventListener('change', (e) => {
+            // Only applies to local preview container? 
+            // No, the user wants "Filtros na câmera".
+            // Applying CSS filters to a canvas context is harder (requires filtering the context).
+            // Easiest: Apply to the canvas ELEMENT. This is visual only locally.
+            // To stream it, we'd need to apply it in WebGL shader.
+            // For now, let's keep CSS filters as "Local View Only" or add to shader?
+            // Adding to shader is better. Let's just stick to WebGL distortions for streaming 
+            // and use CSS on the `remoteVideo` to filter THEM? No, user wants to filter SELF.
+            // Okay, CSS filters on `localCanvas` only affect local view.
+            localCanvas.style.filter = e.target.value;
+        });
+
+
+        // --- 3. Chat & Signaling ---
 
         async function createRoom() {
             const roomsRef = collection(db, 'rooms');
-            // Create a new room with status 'waiting'
             const roomDoc = await addDoc(roomsRef, {
                 status: 'waiting',
-                created: serverTimestamp() // To help clean up old rooms if needed
+                created: serverTimestamp(),
+                callerInfo: currentUser // Save my info
             });
             roomId = roomDoc.id;
             role = 'caller';
-            console.log(`Created room ${roomId} - waiting for someone to join...`);
-            statusText.innerText = "Aguardando alguém...";
-            appendMessage("Procurando alguém para conversar...", "system");
+            statusText.innerText = "Aguardando...";
+            appendMessage("Link criado. Aguardando alguém...", "system");
 
-            // Initialize PC immediately to create offer
-            createPeerConnection(); 
+            createPeerConnection();
 
-            // Listen for remote joining (when they create an Answer)
             unsubscribeRoom = onSnapshot(doc(db, 'rooms', roomId), async (snapshot) => {
                 const data = snapshot.data();
                 if (!data) return;
 
+                // Partner Joined
+                if (data.calleeInfo && !strangerName.innerText.includes(data.calleeInfo.username)) {
+                    updateStrangerInfo(data.calleeInfo);
+                }
+
                 if (data.answer && !peerConnection.currentRemoteDescription) {
-                    console.log('Got remote answer!', data.answer);
                     const rtcSessionDescription = new RTCSessionDescription(data.answer);
                     await peerConnection.setRemoteDescription(rtcSessionDescription);
-                    statusText.innerText = "Conectado com um estranho!";
-                    appendMessage("Você está conversando com um estranho!", "system");
+                    statusText.innerText = "Conectado!";
                     enableChat(true);
                 }
             });
-
-            // Listen for ICE candidates from Callee
-            unsubscribeCandidates = onSnapshot(collection(db, 'rooms', roomId, 'calleeCandidates'), (snapshot) => {
-                snapshot.docChanges().forEach(async (change) => {
-                    if (change.type === 'added') {
-                        let data = change.doc.data();
-                        console.log(`Got new remote ICE candidate: ${JSON.stringify(data)}`);
-                        await peerConnection.addIceCandidate(new RTCIceCandidate(data));
-                    }
-                });
-            });
+            
+            listenForCandidates('calleeCandidates');
         }
 
-        async function joinRoom(roomDocId) {
-            roomId = roomDocId;
+        async function joinRoom(roomData) {
+            roomId = roomData.id;
             role = 'callee';
-            console.log(`Joining room ${roomId}`);
+            
+            // Check if still available (basic check)
+            const roomRef = doc(db, 'rooms', roomId);
+            
+            // Optimistic update
+            await updateDoc(roomRef, { 
+                status: 'occupied',
+                calleeInfo: currentUser
+            });
+
+            // Update UI with Caller info immediately
+            if (roomData.callerInfo) {
+                updateStrangerInfo(roomData.callerInfo);
+            }
+
             statusText.innerText = "Conectando...";
-            appendMessage("Conectando...", "system");
-
-            // Mark room as occupied so no one else joins
-            // Note: In a real high-concurrency app, use transactions.
-            await updateDoc(doc(db, 'rooms', roomId), { status: 'occupied' });
-
             createPeerConnection();
 
-            // Listen for ICE candidates from Caller
-            unsubscribeCandidates = onSnapshot(collection(db, 'rooms', roomId, 'callerCandidates'), (snapshot) => {
-                snapshot.docChanges().forEach(async (change) => {
-                    if (change.type === 'added') {
-                        let data = change.doc.data();
-                        console.log(`Got new remote ICE candidate: ${JSON.stringify(data)}`);
-                        await peerConnection.addIceCandidate(new RTCIceCandidate(data));
-                    }
+            listenForCandidates('callerCandidates');
+
+            // Handle Offer
+            if (roomData.offer) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(roomData.offer));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                await updateDoc(roomRef, {
+                    answer: { type: answer.type, sdp: answer.sdp }
                 });
-            });
-
-            // Create Offer trigger (Caller will have already created offer if logic was swapped, 
-            // but here: Caller creates Room. 
-            // WAIT -> WebRTC standard: Caller creates Offer. Callee creates Answer.
-            
-            // Re-evaluating flow:
-            // 1. Caller creates room.
-            // 2. Caller creates Offer and saves it to room doc.
-            // 3. Callee finds room, reads Offer, sets RemoteDesc, creates Answer, saves Answer.
-            // 4. Caller sees Answer, sets RemoteDesc.
-            
-            // Let's adjust createRoom to create offer immediately.
-        }
-
-        async function hangUp() {
-            statusText.innerText = "Desconectado";
-            appendMessage("Você se desconectou.", "system");
-            
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-                localStream = null;
+                enableChat(true);
+                statusText.innerText = "Conectado!";
             }
-            if (peerConnection) {
-                peerConnection.close();
-                peerConnection = null;
-            }
-            localVideo.srcObject = null;
-            remoteVideo.srcObject = null;
-            remoteStream = null;
-            
-            // Clean up listeners
-            if (unsubscribeRoom) unsubscribeRoom();
-            if (unsubscribeCandidates) unsubscribeCandidates();
-
-            // Delete room if possible (clean up)
-            if (roomId) {
-                try {
-                    // Try to mark as closed or delete
-                    // await deleteDoc(doc(db, 'rooms', roomId));
-                    // Often better to just leave it or mark closed
-                } catch (e) { console.log(e); }
-                roomId = null;
-            }
-
-            // Reset UI
-            startBtn.classList.remove('hidden');
-            stopBtn.classList.add('hidden');
-            enableChat(false);
-            chatArea.innerHTML = '<div class="system-msg">Bem-vindo ao Omegle Clone! Clique em "Iniciar" para encontrar alguém.</div>';
         }
 
         function createPeerConnection() {
             peerConnection = new RTCPeerConnection(servers);
 
-            // Add local stream tracks
-            localStream.getTracks().forEach(track => {
-                peerConnection.addTrack(track, localStream);
-            });
-
-            // Handle remote tracks
-            peerConnection.ontrack = (event) => {
-                event.streams[0].getTracks().forEach(track => {
-                    remoteStream = new MediaStream([track]); // Create new stream or add to existing
-                    remoteVideo.srcObject = event.streams[0];
+            // Add tracks from CANVAS stream (processed video)
+            if (canvasStream) {
+                canvasStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, canvasStream);
                 });
+            } else if (localStream) {
+                 localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+            }
+
+            peerConnection.ontrack = (event) => {
+                remoteVideo.srcObject = event.streams[0];
             };
 
-            // ICE Candidates
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
-                    const collectionName = role === 'caller' ? 'callerCandidates' : 'calleeCandidates';
-                    addDoc(collection(db, 'rooms', roomId, collectionName), event.candidate.toJSON());
+                    const cName = role === 'caller' ? 'callerCandidates' : 'calleeCandidates';
+                    addDoc(collection(db, 'rooms', roomId, cName), event.candidate.toJSON());
                 }
             };
-
-            // Data Channel for Chat
+            
+            // Chat Data Channel
             if (role === 'caller') {
                 dataChannel = peerConnection.createDataChannel("chat");
                 setupDataChannel(dataChannel);
@@ -384,86 +688,118 @@
                     dataChannel = event.channel;
                     setupDataChannel(dataChannel);
                 };
-                // Callee needs to read offer from DB first (handled in finding room logic)
             }
         }
-
-        function setupDataChannel(channel) {
-            channel.onopen = () => console.log("Chat channel open");
-            channel.onmessage = (event) => {
-                appendMessage(event.data, 'stranger');
-            };
-        }
-
+        
         async function createOffer() {
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
-
-            const roomWithOffer = {
-                offer: {
-                    type: offer.type,
-                    sdp: offer.sdp
-                },
-                status: 'waiting',
-                created: serverTimestamp()
-            };
-            
-            // If room already created (via ID), update it. 
-            // But here logic: Caller creates room doc WITH offer.
-            // We need to fix the createRoom logic.
-            await updateDoc(doc(db, 'rooms', roomId), { offer: roomWithOffer.offer });
+            await updateDoc(doc(db, 'rooms', roomId), { 
+                offer: { type: offer.type, sdp: offer.sdp } 
+            });
         }
 
-        async function createAnswer(roomData) {
-            // Role is callee. Room ID is set.
-            const offer = roomData.offer;
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-            
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-
-            const roomAnswer = {
-                answer: {
-                    type: answer.type,
-                    sdp: answer.sdp
-                }
+        function setupDataChannel(channel) {
+            channel.onopen = () => appendMessage("Chat conectado!", "system");
+            channel.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'chat') appendMessage(data.text, 'stranger');
             };
-            
-            await updateDoc(doc(db, 'rooms', roomId), roomAnswer);
-            statusText.innerText = "Conectado com um estranho!";
-            appendMessage("Você está conversando com um estranho!", "system");
-            enableChat(true);
         }
 
-        // --- Main Control Flow ---
+        function listenForCandidates(collectionName) {
+            unsubscribeCandidates = onSnapshot(collection(db, 'rooms', roomId, collectionName), (snapshot) => {
+                snapshot.docChanges().forEach(async (change) => {
+                    if (change.type === 'added') {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(change.doc.data()));
+                    }
+                });
+            });
+        }
         
-        async function startSearch() {
-            // 1. Check permissions and get media
-            const mediaOk = await openUserMedia();
-            if (!mediaOk) return;
+        // --- UI & Helpers ---
 
+        function updateStrangerInfo(info) {
+            strangerProfile.classList.remove('hidden');
+            strangerName.innerText = info.username || "Estranho";
+            strangerBio.innerText = info.bio || "";
+            strangerPic.src = info.pic || "https://via.placeholder.com/150";
+            appendMessage(`Você está falando com ${info.username}.`, "system");
+        }
+
+        async function startSearch() {
+            if (!localStream) {
+                const ok = await initCamera();
+                if(!ok) return;
+            }
+
+            resetChat();
             startBtn.classList.add('hidden');
             stopBtn.classList.remove('hidden');
             statusText.innerText = "Procurando...";
 
-            // 2. Look for existing available room
+            // Find Waiting Room
             const q = query(collection(db, "rooms"), where("status", "==", "waiting"), limit(1));
             const querySnapshot = await getDocs(q);
+            
+            let found = null;
+            querySnapshot.forEach(doc => found = { id: doc.id, ...doc.data() });
 
-            let foundRoom = null;
-            querySnapshot.forEach((doc) => {
-                foundRoom = { id: doc.id, ...doc.data() };
-            });
-
-            if (foundRoom) {
-                // Join as Callee
-                await joinRoom(foundRoom.id);
-                // Need to pass the offer data to establish connection
-                await createAnswer(foundRoom);
+            if (found) {
+                await joinRoom(found);
             } else {
-                // Create as Caller
                 await createRoom();
             }
+        }
+
+        async function hangUp() {
+            statusText.innerText = "Desconectado";
+            startBtn.classList.remove('hidden');
+            stopBtn.classList.add('hidden');
+            enableChat(false);
+            strangerProfile.classList.add('hidden');
+            
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            if (unsubscribeRoom) unsubscribeRoom();
+            if (unsubscribeCandidates) unsubscribeCandidates();
+            
+            // Keep local stream active for self-view, but stop remote
+            remoteVideo.srcObject = null;
+            roomId = null;
+            role = null;
+        }
+
+        function sendMessage() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+            chatInput.value = '';
+            appendMessage(text, 'you');
+            
+            if (dataChannel && dataChannel.readyState === 'open') {
+                dataChannel.send(JSON.stringify({ type: 'chat', text: text }));
+            }
+        }
+
+        function appendMessage(text, type) {
+            const div = document.createElement('div');
+            div.className = 'chat-message';
+            if (type === 'you') {
+                div.innerHTML = `<span class="you-msg font-bold">Você:</span> ${text}`;
+            } else if (type === 'stranger') {
+                div.innerHTML = `<span class="stranger-msg font-bold">${strangerName.innerText}:</span> ${text}`;
+            } else {
+                div.innerHTML = `<span class="system-msg">${text}</span>`;
+            }
+            chatArea.appendChild(div);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        function resetChat() {
+            chatArea.innerHTML = '';
+            chatInput.value = '';
         }
 
         function enableChat(enable) {
@@ -472,26 +808,19 @@
             if(enable) chatInput.focus();
         }
 
-        // Event Listeners
         startBtn.addEventListener('click', startSearch);
-        stopBtn.addEventListener('click', () => {
-            hangUp();
-            // Optionally auto-restart:
-            // startSearch();
-        });
-
-        // Handle page close
+        stopBtn.addEventListener('click', hangUp);
+        sendBtn.addEventListener('click', sendMessage);
+        chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+        
         window.addEventListener('beforeunload', () => {
             if (roomId) hangUp();
         });
-
-        // Keyboard shortcuts
+        
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                // If the Stop button is visible, click it
-                if (!stopBtn.classList.contains('hidden')) {
-                    stopBtn.click();
-                }
+            if (e.key === 'Escape' && !stopBtn.classList.contains('hidden')) {
+                hangUp();
+                appendMessage("Você pulou a conversa.", "system");
             }
         });
 
