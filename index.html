@@ -3,894 +3,496 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wizard's Voice 3D - Voxel Edition</title>
+    <title>Omegle Clone - PobreCraft</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            user-select: none;
-        }
-        
         body {
-            font-family: 'VT323', monospace;
-            background: #1a1a2e;
-            overflow: hidden;
-            color: white;
+            background-color: #f1f1f1;
+            font-family: sans-serif;
         }
-        
-        #gameContainer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            z-index: 1;
-        }
-        
-        /* UI Layers */
-        .ui-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
+        .video-container {
+            position: relative;
+            background: #000;
             width: 100%;
             height: 100%;
-            z-index: 10;
-            pointer-events: none;
-            display: none;
-        }
-        
-        .ui-layer.active {
             display: flex;
-            pointer-events: auto;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border-radius: 8px;
         }
-
-        /* Minecraft-style Buttons */
-        .mc-btn {
-            background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAIklEQVQIW2NkQAKrVq36zwjjgzjwqhgYGP4zMhIyGIOJGQAyzxO9gO049wAAAABJRU5ErkJggg==') repeat;
-            background-color: #7c7c7c;
-            border: 4px solid #000;
-            border-left-color: #aaa;
-            border-top-color: #aaa;
-            border-right-color: #333;
-            border-bottom-color: #333;
-            color: white;
-            padding: 10px 20px;
-            font-family: 'VT323', monospace;
-            font-size: 1.5rem;
-            text-shadow: 2px 2px #000;
-            cursor: pointer;
-            transition: transform 0.1s;
-            image-rendering: pixelated;
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
-        
-        .mc-btn:active {
-            border-left-color: #333;
-            border-top-color: #333;
-            border-right-color: #aaa;
-            border-bottom-color: #aaa;
-            transform: translateY(2px);
-        }
-        
-        .mc-btn:hover {
-            background-color: #8c8c8c;
-        }
-
-        .mc-panel {
-            background-color: rgba(0, 0, 0, 0.7);
-            border: 4px solid #fff;
-            image-rendering: pixelated;
-        }
-
-        .mc-input {
-            background: #000;
-            border: 2px solid #aaa;
-            color: #fff;
-            font-family: 'VT323', monospace;
-            padding: 5px;
-            font-size: 1.2rem;
-        }
-
-        /* Spell Book */
-        .spell-book {
-            position: fixed;
-            left: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: rgba(45, 31, 20, 0.9);
-            border: 4px solid #8b6914;
-            padding: 15px;
-            max-height: 80vh;
-            overflow-y: auto;
-            pointer-events: auto;
-            font-size: 1.2rem;
-        }
-
-        /* Crosshair */
-        #crosshair {
+        #localVideo {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 20px;
-            height: 20px;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            z-index: 20;
+            bottom: 10px;
+            right: 10px;
+            width: 120px;
+            height: 90px;
+            border: 2px solid white;
+            border-radius: 4px;
+            z-index: 10;
+            transform: scaleX(-1); /* Mirror effect */
         }
-        #crosshair::before, #crosshair::after {
-            content: '';
-            position: absolute;
-            background: rgba(255, 255, 255, 0.8);
-        }
-        #crosshair::before { top: 9px; left: 0; width: 20px; height: 2px; }
-        #crosshair::after { left: 9px; top: 0; width: 2px; height: 20px; }
+        /* Filters */
+        .filter-grayscale { filter: grayscale(100%); }
+        .filter-sepia { filter: sepia(100%); }
+        .filter-invert { filter: invert(100%); }
+        .filter-contrast { filter: contrast(160%); }
+        .filter-hue { filter: hue-rotate(90deg); }
+        .filter-blur { filter: blur(3px); }
 
-        /* HUD */
-        .hud-bar {
-            box-shadow: inset 0 0 0 2px #000;
-            border: 2px solid #fff;
+        /* Chat styles */
+        .chat-message {
+            margin-bottom: 8px;
+            padding: 8px;
+            border-radius: 4px;
         }
-
-        /* Animations */
-        @keyframes floating {
-            0% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-10px) rotate(2deg); }
-            100% { transform: translateY(0px) rotate(0deg); }
-        }
-
-        .logo-title {
-            animation: floating 3s ease-in-out infinite;
-            text-shadow: 4px 4px 0 #000;
-        }
+        .stranger-msg { color: blue; }
+        .you-msg { color: gray; }
+        .system-msg { color: #555; font-style: italic; font-size: 0.9em; }
     </style>
 </head>
-<body>
-    <div id="gameContainer"></div>
-    
-    <!-- Crosshair (Hidden in Lobby) -->
-    <div id="crosshair" style="display: none;"></div>
+<body class="h-screen flex flex-col">
 
-    <!-- LOBBY SCREEN -->
-    <div id="lobbyScreen" class="ui-layer active flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
-        <h1 class="logo-title text-8xl text-yellow-400 mb-8 font-bold tracking-widest">WIZARD CRAFT 3D</h1>
+    <!-- Header -->
+    <header class="bg-white p-4 shadow-md flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800"><span class="text-blue-500">Omegle</span> Clone</h1>
+        <div class="text-sm text-gray-500" id="statusText">Desconectado</div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col md:flex-row p-4 gap-4 overflow-hidden">
         
-        <div class="flex gap-8">
-            <!-- Left Panel: Character Preview (Managed by 3D Scene in bg) -->
-            <div class="mc-panel p-6 w-80 flex flex-col items-center justify-between h-96">
-                <h2 class="text-2xl text-amber-300 border-b-2 border-white w-full text-center pb-2">SEU MAGO</h2>
-                <div class="flex-1 flex items-center justify-center text-gray-400 text-center">
-                    (Visualização 3D ao fundo)
-                </div>
-                <div class="w-full text-center text-sm text-gray-300">
-                    Nível 1 • Mago Supremo
-                </div>
-            </div>
-
-            <!-- Right Panel: Controls -->
-            <div class="mc-panel p-6 w-96 flex flex-col gap-4">
-                <button onclick="openModal('createRoomModal')" class="mc-btn w-full text-green-300">CRIAR SALA</button>
-                <button onclick="quickPlay()" class="mc-btn w-full text-yellow-300">JOGO RÁPIDO</button>
-                <button onclick="openModal('settingsModal')" class="mc-btn w-full text-gray-300">CONFIGURAÇÕES</button>
-                <div class="border-t-2 border-gray-600 my-2"></div>
-                <div class="text-center text-gray-400 text-lg">
-                    Use o mouse para olhar<br>WASD para mover<br>VOZ para conjurar
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- CREATE ROOM MODAL -->
-    <div id="createRoomModal" class="ui-layer items-center justify-center bg-black/80 z-50">
-        <div class="mc-panel p-8 w-[500px]">
-            <h2 class="text-4xl text-center text-white mb-6 border-b-4 border-white pb-2">CRIAR SALA</h2>
-            
-            <div class="space-y-4 mb-8">
-                <div>
-                    <label class="block text-xl text-gray-300 mb-1">Nome da Sala</label>
-                    <input type="text" value="Sala do Mago" class="mc-input w-full">
-                </div>
+        <!-- Video Section -->
+        <div class="flex-1 flex flex-col gap-4">
+            <div class="video-container flex-1 relative shadow-lg">
+                <video id="remoteVideo" autoplay playsinline></video>
+                <video id="localVideo" autoplay playsinline muted></video>
                 
-                <div class="flex gap-4">
-                    <div class="flex-1">
-                        <label class="block text-xl text-gray-300 mb-1">Bots</label>
-                        <select id="botSelect" class="mc-input w-full">
-                            <option value="yes">SIM</option>
-                            <option value="no">NÃO</option>
-                        </select>
-                    </div>
-                    <div class="flex-1">
-                        <label class="block text-xl text-gray-300 mb-1">Quantidade</label>
-                        <input type="number" value="10" min="1" max="50" class="mc-input w-full">
-                    </div>
+                <div class="absolute top-4 left-4 bg-black/50 text-white px-2 py-1 rounded text-sm z-20">
+                    Estranho
                 </div>
-
-                <div>
-                    <label class="block text-xl text-gray-300 mb-1">Senha (Opcional)</label>
-                    <input type="password" placeholder="Deixe vazio para pública" class="mc-input w-full">
+                <div class="absolute bottom-4 right-36 bg-black/50 text-white px-2 py-1 rounded text-sm z-20">
+                    Você
                 </div>
+            </div>
 
-                <div>
-                    <label class="block text-xl text-gray-300 mb-1">Modo de Jogo</label>
-                    <select class="mc-input w-full">
-                        <option>Sobrevivência</option>
-                        <option>Mata-Mata</option>
-                        <option>Defesa de Torre</option>
+            <!-- Controls -->
+            <div class="bg-white p-4 rounded-lg shadow-md flex flex-wrap gap-4 items-center justify-between">
+                <div class="flex gap-2 items-center">
+                    <label class="font-semibold text-gray-700">Filtro Câmera:</label>
+                    <select id="filterSelect" class="border rounded p-2 bg-gray-50">
+                        <option value="">Normal</option>
+                        <option value="filter-grayscale">Preto & Branco</option>
+                        <option value="filter-sepia">Sépia</option>
+                        <option value="filter-invert">Invertido</option>
+                        <option value="filter-contrast">Alto Contraste</option>
+                        <option value="filter-hue">Psicodélico</option>
+                        <option value="filter-blur">Desfocado</option>
                     </select>
                 </div>
-            </div>
 
-            <div class="flex gap-4">
-                <button onclick="closeModal('createRoomModal')" class="mc-btn flex-1 bg-red-800 text-red-200">CANCELAR</button>
-                <button onclick="startGame()" class="mc-btn flex-1 text-green-400">INICIAR</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- SETTINGS MODAL -->
-    <div id="settingsModal" class="ui-layer items-center justify-center bg-black/80 z-50">
-        <div class="mc-panel p-8 w-[500px]">
-            <h2 class="text-4xl text-center text-white mb-6">CONFIGURAÇÕES</h2>
-            
-            <div class="space-y-6 mb-8">
-                <div class="flex justify-between items-center">
-                    <span class="text-2xl">Sensibilidade do Mouse</span>
-                    <input type="range" min="1" max="10" value="5" class="accent-yellow-500 w-32">
-                </div>
-                <div class="flex justify-between items-center">
-                    <span class="text-2xl">Volume da Música</span>
-                    <input type="range" min="0" max="100" value="50" class="accent-yellow-500 w-32">
-                </div>
-                <div class="flex justify-between items-center">
-                    <span class="text-2xl">Visualização</span>
-                    <select class="mc-input" id="viewModeSelect" onchange="updateViewMode(this.value)">
-                        <option value="third">3ª Pessoa</option>
-                        <option value="first">1ª Pessoa</option>
-                    </select>
+                <div class="flex gap-2">
+                    <button id="startBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded transition">
+                        Iniciar
+                    </button>
+                    <button id="stopBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded transition hidden">
+                        Parar / Pular
+                    </button>
                 </div>
             </div>
-
-            <button onclick="closeModal('settingsModal')" class="mc-btn w-full">SALVAR E VOLTAR</button>
         </div>
-    </div>
 
-    <!-- GAME HUD -->
-    <div id="gameHUD" class="ui-layer flex-col justify-between p-4 pointer-events-none">
-        <!-- Top Stats -->
-        <div class="flex justify-between items-start pointer-events-auto">
-            <div class="flex gap-4">
-                <div class="flex flex-col gap-1">
-                    <div class="flex items-center gap-2">
-                        <span class="text-2xl">❤️</span>
-                        <div class="w-64 h-6 bg-gray-800 hud-bar relative">
-                            <div id="healthBar" class="h-full bg-red-600 transition-all duration-200" style="width: 100%;"></div>
-                            <span id="healthText" class="absolute inset-0 flex items-center justify-center text-sm font-bold shadow-black drop-shadow-md">100/100</span>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-2xl">⚡</span>
-                        <div class="w-48 h-4 bg-gray-800 hud-bar relative">
-                            <div id="manaBar" class="h-full bg-blue-600 transition-all duration-200" style="width: 100%;"></div>
-                        </div>
-                    </div>
-                </div>
+        <!-- Chat Section -->
+        <div class="w-full md:w-1/3 bg-white rounded-lg shadow-md flex flex-col h-1/2 md:h-full">
+            <div id="chatArea" class="flex-1 p-4 overflow-y-auto border-b border-gray-200 bg-gray-50">
+                <div class="system-msg">Bem-vindo ao Omegle Clone! Clique em "Iniciar" para encontrar alguém.</div>
             </div>
-
-            <div class="flex flex-col items-end">
-                <div class="text-4xl font-bold text-yellow-400 drop-shadow-md">SCORE: <span id="scoreVal">0</span></div>
-                <div class="text-2xl text-purple-300">WAVE <span id="waveVal">1</span></div>
+            <div class="p-4 flex gap-2">
+                <input id="chatInput" type="text" placeholder="Digite uma mensagem..." class="flex-1 border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-400" disabled>
+                <button id="sendBtn" class="bg-gray-200 text-gray-600 px-4 py-2 rounded hover:bg-gray-300 transition" disabled>
+                    <i class="fas fa-paper-plane"></i>
+                </button>
             </div>
         </div>
 
-        <!-- Spell Flash -->
-        <div id="spellFlash" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-6xl font-bold text-white hidden pointer-events-none transition-all duration-200 text-shadow-lg">
-            FIREBALL!
-        </div>
+    </main>
 
-        <!-- Mic Button & Spell Book Toggle -->
-        <div class="pointer-events-auto flex items-end justify-center pb-8 gap-4">
-            <div class="spell-book hidden" id="spellBookPanel">
-                <h3 class="text-yellow-400 border-b border-gray-500 mb-2">GRIMÓRIO</h3>
-                <ul class="text-sm space-y-1" id="spellList">
-                    <!-- Spells injected by JS -->
-                </ul>
-            </div>
+    <!-- Firebase and Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where, getDocs, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-            <button onclick="toggleSpellBook()" class="mc-btn text-sm py-2 px-4 h-12">📖 GRIMÓRIO (TAB)</button>
-            
-            <button id="micBtn" class="mc-btn rounded-full w-20 h-20 flex items-center justify-center border-4 border-white shadow-lg bg-red-600 hover:bg-red-500 active:scale-95 transition-all">
-                <span class="text-4xl">🎤</span>
-            </button>
-        </div>
-    </div>
-
-    <!-- Pause Menu -->
-    <div id="pauseMenu" class="ui-layer items-center justify-center bg-black/60 z-50 hidden">
-        <div class="mc-panel p-8 text-center">
-            <h2 class="text-4xl mb-4">PAUSADO</h2>
-            <button onclick="resumeGame()" class="mc-btn block w-full mb-2">CONTINUAR</button>
-            <button onclick="returnToLobby()" class="mc-btn block w-full bg-red-900">SAIR PARA LOBBY</button>
-        </div>
-    </div>
-
-    <script>
-        // ==================== STATE MANAGEMENT ====================
-        const STATE = {
-            LOBBY: 'lobby',
-            PLAYING: 'playing',
-            PAUSED: 'paused'
-        };
-        let currentState = STATE.LOBBY;
-        let isViewThirdPerson = true;
-
-        // ==================== THREE.JS SETUP ====================
-        const container = document.getElementById('gameContainer');
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB); // Sky blue
-        scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
-
-        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: false }); // False for retro look
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        container.appendChild(renderer.domElement);
-
-        // ==================== TEXTURES GENERATOR ====================
-        function createPixelTexture(color, noise = 0.1) {
-            const size = 64;
-            const canvas = document.createElement('canvas');
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext('2d');
-            
-            ctx.fillStyle = color;
-            ctx.fillRect(0, 0, size, size);
-            
-            for(let i=0; i<size*size*2; i++) {
-                const x = Math.floor(Math.random() * size);
-                const y = Math.floor(Math.random() * size);
-                const shade = (Math.random() - 0.5) * noise * 255;
-                ctx.fillStyle = `rgba(0,0,0,${Math.random() * noise})`;
-                if(Math.random() > 0.5) ctx.fillStyle = `rgba(255,255,255,${Math.random() * noise})`;
-                ctx.fillRect(x, y, 1, 1);
-            }
-            
-            // Draw border for block effect
-            ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-            ctx.lineWidth = 4;
-            ctx.strokeRect(0,0,size,size);
-
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.magFilter = THREE.NearestFilter;
-            texture.minFilter = THREE.NearestFilter;
-            return texture;
-        }
-
-        const textures = {
-            grass: createPixelTexture('#567d46', 0.2),
-            dirt: createPixelTexture('#3d2817', 0.2),
-            stone: createPixelTexture('#7a7a7a', 0.15),
-            wood: createPixelTexture('#5c4033', 0.1),
-            leaves: createPixelTexture('#2d4c1e', 0.3),
-            skin: createPixelTexture('#ffccaa', 0.05),
-            robe: createPixelTexture('#4b0082', 0.1),
-            gold: createPixelTexture('#ffd700', 0.1)
+        // Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDsDeOjhkkKtXK8kBpuVORQ1FTI_EdBTdU",
+            authDomain: "pobrecraft-c517c.firebaseapp.com",
+            projectId: "pobrecraft-c517c",
+            storageBucket: "pobrecraft-c517c.firebasestorage.app",
+            messagingSenderId: "906438912132",
+            appId: "1:906438912132:web:a3d9827600d3c0a52dbad1"
         };
 
-        // ==================== LIGHTING ====================
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(ambientLight);
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
-        const sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        sunLight.position.set(50, 100, 50);
-        sunLight.castShadow = true;
-        sunLight.shadow.mapSize.width = 2048;
-        sunLight.shadow.mapSize.height = 2048;
-        sunLight.shadow.camera.near = 0.5;
-        sunLight.shadow.camera.far = 200;
-        sunLight.shadow.camera.left = -100;
-        sunLight.shadow.camera.right = 100;
-        sunLight.shadow.camera.top = 100;
-        sunLight.shadow.camera.bottom = -100;
-        scene.add(sunLight);
-
-        // ==================== WORLD ====================
-        const groundGeo = new THREE.BoxGeometry(200, 1, 200);
-        const groundMat = new THREE.MeshStandardMaterial({ map: textures.grass });
-        const ground = new THREE.Mesh(groundGeo, groundMat);
-        ground.position.y = -0.5;
-        ground.receiveShadow = true;
-        scene.add(ground);
-
-        // Decor: Trees & Rocks
-        function createTree(x, z) {
-            const group = new THREE.Group();
-            
-            // Trunk
-            const trunkGeo = new THREE.BoxGeometry(1, 4, 1);
-            const trunkMat = new THREE.MeshStandardMaterial({ map: textures.wood });
-            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-            trunk.position.y = 2;
-            trunk.castShadow = true;
-            group.add(trunk);
-
-            // Leaves
-            const leavesGeo = new THREE.BoxGeometry(3, 3, 3);
-            const leavesMat = new THREE.MeshStandardMaterial({ map: textures.leaves });
-            const leaves = new THREE.Mesh(leavesGeo, leavesMat);
-            leaves.position.y = 5;
-            leaves.castShadow = true;
-            group.add(leaves);
-
-            group.position.set(x, 0, z);
-            scene.add(group);
-            return group;
-        }
-
-        for(let i=0; i<30; i++) {
-            const x = (Math.random() - 0.5) * 180;
-            const z = (Math.random() - 0.5) * 180;
-            if(Math.abs(x) > 10 || Math.abs(z) > 10) createTree(x, z);
-        }
-
-        // ==================== PLAYER (WIZARD) ====================
-        const player = {
-            mesh: new THREE.Group(),
-            yaw: new THREE.Group(),
-            pitch: new THREE.Group(),
-            velocity: new THREE.Vector3(),
-            direction: new THREE.Vector3(),
-            speed: 0.3,
-            health: 100,
-            score: 0
+        // WebRTC Config
+        const servers = {
+            iceServers: [
+                { urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }
+            ]
         };
 
-        // Construct Voxel Wizard
-        function createVoxelWizard() {
-            const group = new THREE.Group();
-            
-            // Body
-            const body = new THREE.Mesh(new THREE.BoxGeometry(1, 1.5, 0.6), new THREE.MeshStandardMaterial({ map: textures.robe }));
-            body.position.y = 0.75;
-            body.castShadow = true;
-            group.add(body);
+        // DOM Elements
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const filterSelect = document.getElementById('filterSelect');
+        const statusText = document.getElementById('statusText');
+        const chatArea = document.getElementById('chatArea');
+        const chatInput = document.getElementById('chatInput');
+        const sendBtn = document.getElementById('sendBtn');
 
-            // Head
-            const head = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), new THREE.MeshStandardMaterial({ map: textures.skin }));
-            head.position.y = 1.9;
-            head.castShadow = true;
-            group.add(head);
+        // State Variables
+        let localStream = null;
+        let remoteStream = null;
+        let peerConnection = null;
+        let roomId = null;
+        let role = null; // 'caller' or 'callee'
+        let unsubscribeRoom = null; // Listener for room changes
+        let unsubscribeCandidates = null; // Listener for ice candidates
 
-            // Hat
-            const hatBase = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 1.2), new THREE.MeshStandardMaterial({ map: textures.robe }));
-            hatBase.position.y = 2.4;
-            group.add(hatBase);
-            const hatTop = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1, 0.6), new THREE.MeshStandardMaterial({ map: textures.robe }));
-            hatTop.position.y = 2.9;
-            group.add(hatTop);
-
-            // Staff
-            const staffHandle = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2, 0.1), new THREE.MeshStandardMaterial({ map: textures.wood }));
-            staffHandle.position.set(0.6, 1, 0.4);
-            staffHandle.rotation.x = 0.2;
-            group.add(staffHandle);
-            
-            const staffOrb = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 0.5 }));
-            staffOrb.position.set(0.6, 2.1, 0.5);
-            group.add(staffOrb);
-
-            return group;
-        }
-
-        const wizardMesh = createVoxelWizard();
-        player.mesh.add(wizardMesh);
-        
-        // Setup Camera Hierarchy for Pointer Lock
-        // player.yaw rotates Y (left/right)
-        // player.pitch rotates X (up/down) attached to yaw
-        scene.add(player.yaw);
-        player.yaw.add(player.pitch);
-        
-        // Add player mesh to Yaw so it rotates with look
-        player.yaw.add(player.mesh);
-        
-        // Initial Camera Pos
-        player.pitch.add(camera);
-        camera.position.set(0, 3, 5); // Third person default
-        camera.lookAt(0, 2, 0);
-
-        // ==================== CONTROLS (POINTER LOCK) ====================
-        const keys = { w: false, a: false, s: false, d: false };
-        
-        document.addEventListener('keydown', (e) => {
-            const k = e.key.toLowerCase();
-            if(keys.hasOwnProperty(k)) keys[k] = true;
-            if(k === 'tab') { e.preventDefault(); toggleSpellBook(); }
-            if(k === 'escape') {
-                if(currentState === STATE.PLAYING) pauseGame();
-                else if(currentState === STATE.PAUSED) resumeGame();
-            }
-        });
-        
-        document.addEventListener('keyup', (e) => {
-            const k = e.key.toLowerCase();
-            if(keys.hasOwnProperty(k)) keys[k] = false;
+        // --- Filter Logic ---
+        filterSelect.addEventListener('change', (e) => {
+            localVideo.className = e.target.value;
+            // Note: Sending filtered video over WebRTC is complex (requires canvas processing).
+            // For this clone, we apply the filter visually on the local element. 
+            // To send it, we'd need to captureStream from a canvas. 
+            // Let's keep it simple: visual only for now, or users can only see their own filter.
         });
 
-        document.addEventListener('mousemove', (e) => {
-            if (currentState !== STATE.PLAYING) return;
-            
-            const sensitivity = 0.002;
-            player.yaw.rotation.y -= e.movementX * sensitivity;
-            player.pitch.rotation.x -= e.movementY * sensitivity;
-            
-            // Clamp pitch
-            player.pitch.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, player.pitch.rotation.x));
-        });
-
-        // Request pointer lock on click if playing
-        container.addEventListener('click', () => {
-            if (currentState === STATE.PLAYING) {
-                container.requestPointerLock();
-            }
-        });
-
-        // ==================== UI FUNCTIONS ====================
-        function openModal(id) {
-            document.getElementById(id).style.display = 'flex';
-        }
-        
-        function closeModal(id) {
-            document.getElementById(id).style.display = 'none';
-        }
-
-        function quickPlay() {
-            startGame();
-        }
-
-        function startGame() {
-            closeModal('createRoomModal');
-            document.getElementById('lobbyScreen').classList.remove('active');
-            document.getElementById('gameHUD').classList.add('active');
-            document.getElementById('crosshair').style.display = 'block';
-            
-            currentState = STATE.PLAYING;
-            container.requestPointerLock();
-            
-            // Reset player pos
-            player.yaw.position.set(0, 0, 0);
-            player.yaw.rotation.set(0, 0, 0);
-            player.pitch.rotation.set(0, 0, 0);
-            player.health = 100;
-            player.score = 0;
-            
-            updateViewMode(document.getElementById('viewModeSelect').value);
-            spawnInitialEnemies();
-        }
-
-        function pauseGame() {
-            currentState = STATE.PAUSED;
-            document.exitPointerLock();
-            document.getElementById('pauseMenu').style.display = 'flex';
-        }
-
-        function resumeGame() {
-            currentState = STATE.PLAYING;
-            document.getElementById('pauseMenu').style.display = 'none';
-            container.requestPointerLock();
-        }
-
-        function returnToLobby() {
-            currentState = STATE.LOBBY;
-            document.getElementById('pauseMenu').style.display = 'none';
-            document.getElementById('gameHUD').classList.remove('active');
-            document.getElementById('lobbyScreen').classList.add('active');
-            document.getElementById('crosshair').style.display = 'none';
-            
-            // Reset Camera for Lobby
-            player.yaw.rotation.set(0, 0, 0);
-            player.pitch.rotation.set(0, 0, 0);
-            camera.position.set(0, 2, 6);
-            camera.lookAt(0, 1.5, 0);
-            
-            // Clear enemies
-            enemies.forEach(e => scene.remove(e.mesh));
-            enemies = [];
-        }
-
-        function updateViewMode(mode) {
-            isViewThirdPerson = (mode === 'third');
-            if(isViewThirdPerson) {
-                camera.position.set(0, 3, 5);
-                player.mesh.visible = true;
+        // --- Chat Logic ---
+        function appendMessage(text, type) {
+            const div = document.createElement('div');
+            div.className = 'chat-message';
+            if (type === 'you') {
+                div.innerHTML = `<span class="you-msg font-bold">Você:</span> ${text}`;
+            } else if (type === 'stranger') {
+                div.innerHTML = `<span class="stranger-msg font-bold">Estranho:</span> ${text}`;
             } else {
-                camera.position.set(0, 2, 0.5);
-                player.mesh.visible = false;
+                div.innerHTML = `<span class="system-msg">${text}</span>`;
+            }
+            chatArea.appendChild(div);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const text = chatInput.value.trim();
+            if (!text || !roomId) return;
+            
+            chatInput.value = '';
+            appendMessage(text, 'you');
+
+            // Save message to subcollection 'messages' in the room document
+            // Assuming we have read/write access. If not, we rely on data channel (WebRTC)
+            // But let's try Data Channel for chat as it's cleaner for P2P text without DB latency.
+            if (dataChannel && dataChannel.readyState === 'open') {
+                dataChannel.send(text);
+            } else {
+                console.warn("Data channel not open");
             }
         }
 
-        function toggleSpellBook() {
-            const panel = document.getElementById('spellBookPanel');
-            panel.classList.toggle('hidden');
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+        sendBtn.addEventListener('click', sendMessage);
+
+        let dataChannel = null;
+
+        // --- Media Setup ---
+        async function openUserMedia() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                localStream = stream;
+                localVideo.srcObject = stream;
+                return true;
+            } catch (error) {
+                console.error('Error accessing media devices.', error);
+                alert('Erro ao acessar câmera/microfone. Verifique as permissões.');
+                return false;
+            }
         }
 
-        // ==================== VOICE & SPELLS ====================
-        const spells = {
-            'fogo': { color: 0xff4400, type: 'projectile', speed: 1.0, damage: 25 },
-            'fire': { color: 0xff4400, type: 'projectile', speed: 1.0, damage: 25 },
-            'gelo': { color: 0x00ffff, type: 'projectile', speed: 1.2, damage: 20 },
-            'ice': { color: 0x00ffff, type: 'projectile', speed: 1.2, damage: 20 },
-            'raio': { color: 0xffff00, type: 'instant', range: 20, damage: 40 },
-            'thunder': { color: 0xffff00, type: 'instant', range: 20, damage: 40 },
-            'cura': { color: 0x00ff00, type: 'self', heal: 30 },
-            'heal': { color: 0x00ff00, type: 'self', heal: 30 },
-            'escudo': { color: 0x0000ff, type: 'buff', duration: 5000 }
-        };
+        // --- Signaling / Matching Logic ---
 
-        // Populate spell list UI
-        const spellListEl = document.getElementById('spellList');
-        Object.keys(spells).forEach(spell => {
-            if(spellListEl.innerHTML.includes(spells[spell].color)) return; // Avoid duplicates
-            const li = document.createElement('li');
-            li.innerHTML = `<span style="color:#${spells[spell].color.toString(16)}">■</span> ${spell.toUpperCase()}`;
-            spellListEl.appendChild(li);
-        });
+        async function createRoom() {
+            const roomsRef = collection(db, 'rooms');
+            // Create a new room with status 'waiting'
+            const roomDoc = await addDoc(roomsRef, {
+                status: 'waiting',
+                created: serverTimestamp() // To help clean up old rooms if needed
+            });
+            roomId = roomDoc.id;
+            role = 'caller';
+            console.log(`Created room ${roomId} - waiting for someone to join...`);
+            statusText.innerText = "Aguardando alguém...";
+            appendMessage("Procurando alguém para conversar...", "system");
 
-        let recognition;
-        let isListening = false;
+            // Initialize PC immediately to create offer
+            createPeerConnection(); 
 
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            recognition = new SpeechRecognition();
-            recognition.continuous = true;
-            recognition.interimResults = false;
-            recognition.lang = 'pt-BR';
+            // Listen for remote joining (when they create an Answer)
+            unsubscribeRoom = onSnapshot(doc(db, 'rooms', roomId), async (snapshot) => {
+                const data = snapshot.data();
+                if (!data) return;
 
-            recognition.onresult = (event) => {
-                const last = event.results.length - 1;
-                const command = event.results[last][0].transcript.trim().toLowerCase().split(' ')[0];
-                console.log('Voice:', command);
-                
-                if (spells[command]) {
-                    castSpell(command);
+                if (data.answer && !peerConnection.currentRemoteDescription) {
+                    console.log('Got remote answer!', data.answer);
+                    const rtcSessionDescription = new RTCSessionDescription(data.answer);
+                    await peerConnection.setRemoteDescription(rtcSessionDescription);
+                    statusText.innerText = "Conectado com um estranho!";
+                    appendMessage("Você está conversando com um estranho!", "system");
+                    enableChat(true);
                 }
-            };
+            });
 
-            recognition.onend = () => { if(isListening) recognition.start(); };
-        }
-
-        document.getElementById('micBtn').addEventListener('click', () => {
-            if(!recognition) { alert('Navegador não suporta voz'); return; }
-            const btn = document.getElementById('micBtn');
-            if(isListening) {
-                recognition.stop();
-                isListening = false;
-                btn.classList.remove('bg-green-600');
-                btn.classList.add('bg-red-600');
-            } else {
-                recognition.start();
-                isListening = true;
-                btn.classList.remove('bg-red-600');
-                btn.classList.add('bg-green-600');
-            }
-        });
-
-        // Spell Logic
-        let projectiles = [];
-        
-        function castSpell(name) {
-            const spell = spells[name];
-            
-            // UI Feedback
-            const flash = document.getElementById('spellFlash');
-            flash.textContent = name.toUpperCase() + "!";
-            flash.style.color = '#' + spell.color.toString(16);
-            flash.style.display = 'block';
-            flash.style.transform = 'translate(-50%, -50%) scale(1.5)';
-            flash.style.opacity = '1';
-            
-            setTimeout(() => {
-                flash.style.opacity = '0';
-                flash.style.transform = 'translate(-50%, -50%) scale(1)';
-            }, 500);
-
-            // Game Logic
-            if(spell.type === 'projectile') {
-                const geo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-                const mat = new THREE.MeshBasicMaterial({ color: spell.color });
-                const mesh = new THREE.Mesh(geo, mat);
-                
-                // Position at staff or camera front
-                const origin = new THREE.Vector3(0, 2, 0);
-                origin.applyMatrix4(player.yaw.matrixWorld);
-                
-                // Direction
-                const direction = new THREE.Vector3(0, 0, -1);
-                direction.applyQuaternion(player.yaw.quaternion);
-                direction.applyQuaternion(player.pitch.quaternion);
-                
-                mesh.position.copy(player.yaw.position).add(origin);
-                scene.add(mesh);
-                
-                projectiles.push({ mesh, velocity: direction.multiplyScalar(spell.speed), damage: spell.damage, life: 100 });
-            }
-            else if (spell.type === 'heal') {
-                player.health = Math.min(100, player.health + spell.heal);
-                updateHUD();
-            }
-        }
-
-        // ==================== ENEMIES ====================
-        let enemies = [];
-        const enemyGeo = new THREE.BoxGeometry(1, 1, 1);
-        const baseEnemyTexture = createPixelTexture('#ff0000', 0.2);
-
-        function spawnEnemy() {
-            const mesh = new THREE.Group();
-            
-            // Body - Clone material for independent flashing
-            const mat = new THREE.MeshStandardMaterial({ map: baseEnemyTexture });
-            const body = new THREE.Mesh(enemyGeo, mat);
-            body.position.y = 0.5;
-            body.castShadow = true;
-            mesh.add(body);
-            
-            // Eyes
-            const eyeGeo = new THREE.BoxGeometry(0.2, 0.2, 0.1);
-            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-            const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-            leftEye.position.set(-0.2, 0.7, 0.5);
-            mesh.add(leftEye);
-            const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-            rightEye.position.set(0.2, 0.7, 0.5);
-            mesh.add(rightEye);
-
-            const angle = Math.random() * Math.PI * 2;
-            const dist = 30 + Math.random() * 20;
-            mesh.position.set(
-                Math.cos(angle) * dist,
-                0,
-                Math.sin(angle) * dist
-            );
-            
-            scene.add(mesh);
-            enemies.push({ 
-                mesh, 
-                bodyMesh: body, // Reference to body for color changing
-                health: 50, 
-                speed: 0.1 + Math.random() * 0.05,
-                isHit: false
+            // Listen for ICE candidates from Callee
+            unsubscribeCandidates = onSnapshot(collection(db, 'rooms', roomId, 'calleeCandidates'), (snapshot) => {
+                snapshot.docChanges().forEach(async (change) => {
+                    if (change.type === 'added') {
+                        let data = change.doc.data();
+                        console.log(`Got new remote ICE candidate: ${JSON.stringify(data)}`);
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(data));
+                    }
+                });
             });
         }
 
-        function spawnInitialEnemies() {
-            for(let i=0; i<5; i++) spawnEnemy();
-        }
+        async function joinRoom(roomDocId) {
+            roomId = roomDocId;
+            role = 'callee';
+            console.log(`Joining room ${roomId}`);
+            statusText.innerText = "Conectando...";
+            appendMessage("Conectando...", "system");
 
-        // ==================== GAME LOOP ====================
-        function updateHUD() {
-            document.getElementById('healthBar').style.width = `${player.health}%`;
-            document.getElementById('healthText').innerText = `${Math.floor(player.health)}/100`;
-            document.getElementById('scoreVal').innerText = player.score;
-        }
+            // Mark room as occupied so no one else joins
+            // Note: In a real high-concurrency app, use transactions.
+            await updateDoc(doc(db, 'rooms', roomId), { status: 'occupied' });
 
-        function animate() {
-            requestAnimationFrame(animate);
+            createPeerConnection();
 
-            if (currentState === STATE.LOBBY) {
-                // Rotate camera around wizard in lobby
-                const t = Date.now() * 0.0005;
-                camera.position.x = Math.cos(t) * 8;
-                camera.position.z = Math.sin(t) * 8;
-                camera.position.y = 3;
-                camera.lookAt(0, 1.5, 0);
-                
-                // Idle animation
-                player.mesh.children[0].position.y = 0.75 + Math.sin(t * 4) * 0.05;
-            }
-            else if (currentState === STATE.PLAYING) {
-                // Player Movement
-                const moveSpeed = player.speed;
-                const dir = new THREE.Vector3();
-                
-                if(keys.w) dir.z -= 1;
-                if(keys.s) dir.z += 1;
-                if(keys.a) dir.x -= 1;
-                if(keys.d) dir.x += 1;
-                
-                if(dir.length() > 0) {
-                    dir.normalize();
-                    // Align movement to Yaw rotation (y-axis only)
-                    dir.applyQuaternion(player.yaw.quaternion);
-                    player.yaw.position.add(dir.multiplyScalar(moveSpeed));
-                }
-
-                // Projectiles
-                for(let i = projectiles.length-1; i>=0; i--) {
-                    const p = projectiles[i];
-                    p.mesh.position.add(p.velocity);
-                    p.life--;
-                    
-                    // Collision with ground
-                    if(p.mesh.position.y < 0 || p.life <= 0) {
-                        scene.remove(p.mesh);
-                        projectiles.splice(i, 1);
-                        continue;
-                    }
-
-                    // Collision with enemies
-                    for(let j = enemies.length-1; j>=0; j--) {
-                        const e = enemies[j];
-                        if(p.mesh.position.distanceTo(e.mesh.position) < 1.5) {
-                            e.health -= p.damage;
-                            
-                            // Hit effect
-                            if (!e.isHit) {
-                                e.isHit = true;
-                                const originalColor = 0xffffff; // The texture provides color, tint is white by default
-                                e.bodyMesh.material.emissive.setHex(0xff0000); // Flash red emissive
-                                e.bodyMesh.material.emissiveIntensity = 1;
-                                
-                                setTimeout(() => {
-                                    if(e && e.bodyMesh) {
-                                        e.bodyMesh.material.emissive.setHex(0x000000);
-                                        e.bodyMesh.material.emissiveIntensity = 0;
-                                        e.isHit = false;
-                                    }
-                                }, 100);
-                            }
-                            
-                            scene.remove(p.mesh);
-                            projectiles.splice(i, 1);
-                            
-                            if(e.health <= 0) {
-                                scene.remove(e.mesh);
-                                enemies.splice(j, 1);
-                                player.score += 10;
-                                updateHUD();
-                                spawnEnemy(); // Respawn
-                            }
-                            break;
-                        }
-                    }
-                }
-
-                // Enemies
-                enemies.forEach(e => {
-                    const dir = new THREE.Vector3().subVectors(player.yaw.position, e.mesh.position);
-                    dir.y = 0;
-                    if(dir.length() > 1) {
-                        dir.normalize();
-                        e.mesh.position.add(dir.multiplyScalar(e.speed));
-                        e.mesh.lookAt(player.yaw.position);
-                    } else {
-                        // Damage player
-                        player.health -= 0.1;
-                        updateHUD();
+            // Listen for ICE candidates from Caller
+            unsubscribeCandidates = onSnapshot(collection(db, 'rooms', roomId, 'callerCandidates'), (snapshot) => {
+                snapshot.docChanges().forEach(async (change) => {
+                    if (change.type === 'added') {
+                        let data = change.doc.data();
+                        console.log(`Got new remote ICE candidate: ${JSON.stringify(data)}`);
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(data));
                     }
                 });
+            });
 
-                if(player.health <= 0) {
-                    alert('GAME OVER! Score: ' + player.score);
-                    returnToLobby();
-                }
-            }
-
-            renderer.render(scene, camera);
+            // Create Offer trigger (Caller will have already created offer if logic was swapped, 
+            // but here: Caller creates Room. 
+            // WAIT -> WebRTC standard: Caller creates Offer. Callee creates Answer.
+            
+            // Re-evaluating flow:
+            // 1. Caller creates room.
+            // 2. Caller creates Offer and saves it to room doc.
+            // 3. Callee finds room, reads Offer, sets RemoteDesc, creates Answer, saves Answer.
+            // 4. Caller sees Answer, sets RemoteDesc.
+            
+            // Let's adjust createRoom to create offer immediately.
         }
 
-        // Start loop
-        animate();
+        async function hangUp() {
+            statusText.innerText = "Desconectado";
+            appendMessage("Você se desconectou.", "system");
+            
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            localVideo.srcObject = null;
+            remoteVideo.srcObject = null;
+            remoteStream = null;
+            
+            // Clean up listeners
+            if (unsubscribeRoom) unsubscribeRoom();
+            if (unsubscribeCandidates) unsubscribeCandidates();
 
-        // Handle resize
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            // Delete room if possible (clean up)
+            if (roomId) {
+                try {
+                    // Try to mark as closed or delete
+                    // await deleteDoc(doc(db, 'rooms', roomId));
+                    // Often better to just leave it or mark closed
+                } catch (e) { console.log(e); }
+                roomId = null;
+            }
+
+            // Reset UI
+            startBtn.classList.remove('hidden');
+            stopBtn.classList.add('hidden');
+            enableChat(false);
+            chatArea.innerHTML = '<div class="system-msg">Bem-vindo ao Omegle Clone! Clique em "Iniciar" para encontrar alguém.</div>';
+        }
+
+        function createPeerConnection() {
+            peerConnection = new RTCPeerConnection(servers);
+
+            // Add local stream tracks
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
+
+            // Handle remote tracks
+            peerConnection.ontrack = (event) => {
+                event.streams[0].getTracks().forEach(track => {
+                    remoteStream = new MediaStream([track]); // Create new stream or add to existing
+                    remoteVideo.srcObject = event.streams[0];
+                });
+            };
+
+            // ICE Candidates
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    const collectionName = role === 'caller' ? 'callerCandidates' : 'calleeCandidates';
+                    addDoc(collection(db, 'rooms', roomId, collectionName), event.candidate.toJSON());
+                }
+            };
+
+            // Data Channel for Chat
+            if (role === 'caller') {
+                dataChannel = peerConnection.createDataChannel("chat");
+                setupDataChannel(dataChannel);
+                createOffer();
+            } else {
+                peerConnection.ondatachannel = (event) => {
+                    dataChannel = event.channel;
+                    setupDataChannel(dataChannel);
+                };
+                // Callee needs to read offer from DB first (handled in finding room logic)
+            }
+        }
+
+        function setupDataChannel(channel) {
+            channel.onopen = () => console.log("Chat channel open");
+            channel.onmessage = (event) => {
+                appendMessage(event.data, 'stranger');
+            };
+        }
+
+        async function createOffer() {
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+
+            const roomWithOffer = {
+                offer: {
+                    type: offer.type,
+                    sdp: offer.sdp
+                },
+                status: 'waiting',
+                created: serverTimestamp()
+            };
+            
+            // If room already created (via ID), update it. 
+            // But here logic: Caller creates room doc WITH offer.
+            // We need to fix the createRoom logic.
+            await updateDoc(doc(db, 'rooms', roomId), { offer: roomWithOffer.offer });
+        }
+
+        async function createAnswer(roomData) {
+            // Role is callee. Room ID is set.
+            const offer = roomData.offer;
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+
+            const roomAnswer = {
+                answer: {
+                    type: answer.type,
+                    sdp: answer.sdp
+                }
+            };
+            
+            await updateDoc(doc(db, 'rooms', roomId), roomAnswer);
+            statusText.innerText = "Conectado com um estranho!";
+            appendMessage("Você está conversando com um estranho!", "system");
+            enableChat(true);
+        }
+
+        // --- Main Control Flow ---
+        
+        async function startSearch() {
+            // 1. Check permissions and get media
+            const mediaOk = await openUserMedia();
+            if (!mediaOk) return;
+
+            startBtn.classList.add('hidden');
+            stopBtn.classList.remove('hidden');
+            statusText.innerText = "Procurando...";
+
+            // 2. Look for existing available room
+            const q = query(collection(db, "rooms"), where("status", "==", "waiting"), limit(1));
+            const querySnapshot = await getDocs(q);
+
+            let foundRoom = null;
+            querySnapshot.forEach((doc) => {
+                foundRoom = { id: doc.id, ...doc.data() };
+            });
+
+            if (foundRoom) {
+                // Join as Callee
+                await joinRoom(foundRoom.id);
+                // Need to pass the offer data to establish connection
+                await createAnswer(foundRoom);
+            } else {
+                // Create as Caller
+                await createRoom();
+            }
+        }
+
+        function enableChat(enable) {
+            chatInput.disabled = !enable;
+            sendBtn.disabled = !enable;
+            if(enable) chatInput.focus();
+        }
+
+        // Event Listeners
+        startBtn.addEventListener('click', startSearch);
+        stopBtn.addEventListener('click', () => {
+            hangUp();
+            // Optionally auto-restart:
+            // startSearch();
+        });
+
+        // Handle page close
+        window.addEventListener('beforeunload', () => {
+            if (roomId) hangUp();
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                // If the Stop button is visible, click it
+                if (!stopBtn.classList.contains('hidden')) {
+                    stopBtn.click();
+                }
+            }
         });
 
     </script>
